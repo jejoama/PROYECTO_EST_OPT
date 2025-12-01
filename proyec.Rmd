@@ -34,3 +34,18 @@ Xtest <- window(train_serie, start=floor(0.8*filas_train)+1, end=filas_train)
 
 ```
 
+
+
+PASO 2
+Nos pide tanto la varianza como el valor esperado de neustra estimación. Haciendolo de modo que en nuestro tiempo t, cojamos todo lo del pasado --> t-1... --> para ello Modelo ARIMA
+```{r}
+
+```
+
+
+
+
+
+
+
+
