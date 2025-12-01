@@ -19,3 +19,18 @@ summary(train_serie)
 
 ```
 
+#DIVISIÓN TRAIN vs. TEST
+
+```{r}
+filas_train <- nrow(train)
+
+#Hemos pensando en dividirlo en 80% train vs 20% Test
+
+#Entrenamiento --> 96 primeros
+Xtrain <- window(train_serie, start=1, end=0.8*filas_train)
+
+# Validación: 24 ultimos
+Xtest <- window(train_serie, start=(0.8*filas_train)+1, end=filas_train)
+
+```
+
