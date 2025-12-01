@@ -1,0 +1,241 @@
+---
+title: "Proyecto EO"
+author: "Fabián Calvo Castillo"
+date: "2025-12-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tseries)
+library(forecast)
+library(rugarch)
+
+
+data <- read.csv("stock_returns_train.csv")
+activos <- names(data)
+
+resultados <- data.frame(
+  Activo = character(),
+  ADF_pvalue = numeric(),      
+  LjungBox_Mean_pvalue = numeric(), 
+  LjungBox_Arch_pvalue = numeric(), 
+  Model_Suggestion = character(),
+  stringsAsFactors = FALSE
+)
+
+
+for (x in activos) {
+  serie <- data[[x]]
+  
+  # A. Test de Estacionariedad (Augmented Dickey-Fuller)
+  # H0: La serie NO es estacionaria. (Si p < 0.05, es estacionaria)
+  adf <- adf.test(serie)
+  
+  # B. Test de Autocorrelación en la Media (Ljung-Box)
+  # H0: Los datos son ruido blanco (Independientes). (Si p < 0.05, hay patrón ARIMA)
+  lb_mean <- Box.test(serie, type = "Ljung-Box", lag = 10)
+  
+  # C. Test de Efectos ARCH (Ljung-Box en cuadrados)
+  # H0: No hay heterocedasticidad condicional. (Si p < 0.05, hay patrón GARCH)
+  lb_arch <- Box.test(serie^2, type = "Ljung-Box", lag = 10)
+  
+  # Lógica simple de sugerencia
+  sugerencia <- "Ruido Blanco (Mean/Var Constante)"
+  if (lb_mean$p.value < 0.05 && lb_arch$p.value < 0.05) {
+    sugerencia <- "ARIMA + GARCH"
+  } else if (lb_mean$p.value < 0.05) {
+    sugerencia <- "ARIMA (Varianza Constante)"
+  } else if (lb_arch$p.value < 0.05) {
+    sugerencia <- "Media Constante + GARCH"
+  }
+  
+  resultados[nrow(resultados) + 1, ] <- list(
+    x, 
+    round(adf$p.value, 4), 
+    round(lb_mean$p.value, 4), 
+    round(lb_arch$p.value, 4),
+    sugerencia
+  )
+}
+
+print(resultados)
+
+par(mfrow=c(2,3))
+for(x in activos) {
+  acf(data[[x]], main=paste("ACF", x))
+}
+```
+
+  Estacionariedad (ADF Test):
+Todos los activos (X1 a X5) tienen un p-value < 0.05.
+
+Por ende, las series son estacionarias. No es necesario diferenciarlas (d=0 en ARIMA). Se pueden modelar los rendimientos directamente.
+
+  Comportamiento de la Media (Test Ljung-Box):
+X1, X2, X5: El p-value tienen un valor alto (> 0.05). No hay evidencia de autocorrelación significativa. El mejor predictor para mañana es simplemente la media histórica (constante).
+X3, X4: El p-value es bajo (< 0.05). Existe una estructura de dependencia temporal.
+
+Por lo tanto, X3 y X4 requieren modelos ARIMA (AR(1) o MA(1)). X1, X2, X5 se modelan con Media Constante.
+
+  Comportamiento de la Varianza (Test ARCH):
+X1, X2, X3, X4: El p-value en los cuadrados es alto. La volatilidad es relativamente constante.
+X5: El p-value es bajo (< 0.05). Los retornos al cuadrado tienen autocorrelación (si ayer hubo un movimiento brusco, hoy es probable que también).
+
+Esto significa que X5 requiere un modelo GARCH para estimar su riesgo variable. Los demás usarán varianza muestral constante.
+
+
+
+```{r}
+library(forecast)
+library(rugarch)
+
+# Cargar datos de entrenamiento
+data_train <- read.csv("stock_returns_train.csv")
+
+# --- BLOQUE 1: Definición de Modelos por Activo ---
+
+# Activos X1 y X2: Ruido Blanco
+# Usamos auto.arima forzando estacionariedad. Probablemente resultará en ARIMA(0,0,0) con media.
+fit_x1 <- auto.arima(data_train$X1, stationary = TRUE, seasonal = FALSE)
+fit_x2 <- auto.arima(data_train$X2, stationary = TRUE, seasonal = FALSE)
+
+# Activos X3 y X4: Patrones en la Media (ARIMA)
+# Dejamos que auto.arima encuentre el mejor p y q (basado en AIC)
+fit_x3 <- auto.arima(data_train$X3, stationary = TRUE, seasonal = FALSE)
+fit_x4 <- auto.arima(data_train$X4, stationary = TRUE, seasonal = FALSE)
+
+# Activo X5: Patrón en la Varianza (GARCH)
+# Especificamos un GARCH(1,1) estándar con media constante (armaOrder=c(0,0))
+spec_x5 <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
+  mean.model = list(armaOrder = c(0, 0), include.mean = TRUE),
+  distribution.model = "norm"
+)
+fit_x5 <- ugarchfit(spec = spec_x5, data = data_train$X5)
+
+# --- BLOQUE 2: Estimación de Correlaciones (Matriz R) ---
+# Necesaria para descomponer la covarianza según ecuación (6) del PDF: Sigma = D R D [cite: 32]
+
+# Extraemos los residuos (la parte aleatoria que el modelo no explicó)
+res_x1 <- residuals(fit_x1)
+res_x2 <- residuals(fit_x2)
+res_x3 <- residuals(fit_x3)
+res_x4 <- residuals(fit_x4)
+# Para GARCH, usamos los residuos estandarizados (z_t)
+res_x5 <- residuals(fit_x5, standardize = TRUE)
+
+# Creamos la matriz de correlación constante R
+# Esta matriz describe cómo se mueven los activos juntos después de limpiar sus patrones individuales
+R_matrix <- cor(cbind(res_x1, res_x2, res_x3, res_x4, res_x5))
+
+# --- BLOQUE 3: Guardar todo en una lista ---
+# Esta lista 'fitted_models' es lo que pasaremos a la función de predicción
+fitted_models <- list(
+  m1 = fit_x1,
+  m2 = fit_x2,
+  m3 = fit_x3,
+  m4 = fit_x4,
+  m5_spec = spec_x5,  # Guardamos la especificación para re-ajustar en el futuro
+  m5_fit = fit_x5,    # Guardamos el ajuste inicial por si acaso
+  R = R_matrix
+)
+
+# Salida visual de confirmación
+cat("Modelos entrenados correctamente.\n")
+cat("Orden ARIMA X3:", arimaorder(fit_x3), "\n")
+cat("Orden ARIMA X4:", arimaorder(fit_x4), "\n")
+```
+
+```{r}
+# Función oneStepAhead
+# Input: 
+#   - history_data: Dataframe o matriz con los rendimientos históricos hasta t-1
+#   - models: La lista 'fitted_models' que creamos en el entrenamiento
+# Output:
+#   - Lista con 'mu' (vector de medias esperadas) y 'Sigma' (matriz de covarianzas)
+
+oneStepAhead <- function(history_data, models) {
+  
+  # Asegurarnos de que sea un dataframe o matriz
+  history_data <- as.data.frame(history_data)
+  n_assets <- ncol(history_data)
+  
+  # Vectores vacíos para guardar los pronósticos
+  mu_pred <- numeric(n_assets)
+  sigma_pred <- numeric(n_assets)
+  
+  # --- BLOQUE A: Predicción para X1, X2, X3, X4 (Modelos ARIMA) ---
+  # Usamos Arima() pasando 'model=' para mantener la estructura (p,d,q) encontrada
+  # en el entrenamiento, pero re-estimando los coeficientes con los nuevos datos.
+  
+  # Lista de modelos guardados para iterar
+  arima_models_list <- list(models$m1, models$m2, models$m3, models$m4)
+  
+  for(i in 1:4) {
+    # El modelo guardado sirve de "plantilla"
+    modelo_base <- arima_models_list[[i]]
+    
+    # Ajustamos la plantilla a TODA la historia disponible hasta hoy
+    # Esto cumple con el punto 3: "utilizar todo el pasado de la serie"
+    fit_actualizado <- Arima(history_data[, i], model = modelo_base)
+    
+    # Pronosticamos 1 paso adelante (t+1)
+    fc <- forecast(fit_actualizado, h = 1)
+    
+    mu_pred[i] <- fc$mean[1] # Valor esperado (Retorno)
+    
+    # Para ARIMA, la varianza del error se asume constante (sigma2)
+    # A menos que el modelo tenga componentes dinámicos, esta sigma no cambiará mucho,
+    # pero es la forma correcta de extraerla.
+    sigma_pred[i] <- sqrt(fit_actualizado$sigma2) 
+  }
+  
+  # --- BLOQUE B: Predicción para X5 (Modelo GARCH) ---
+  # Para GARCH, la volatilidad cambia cada día. Es vital re-ajustar o filtrar.
+  
+  # Re-ajustamos el modelo GARCH con todos los datos históricos (solver 'hybrid' para estabilidad)
+  # Usamos la especificación (spec) guardada, no el ajuste antiguo.
+  fit_garch_actualizado <- ugarchfit(
+    spec = models$m5_spec, 
+    data = history_data[, 5], 
+    solver = "hybrid"
+  )
+  
+  # Pronosticamos 1 paso adelante
+  fc_garch <- ugarchforecast(fit_garch_actualizado, n.ahead = 1)
+  
+  mu_pred[5] <- fitted(fc_garch)[1]  # Media condicional
+  sigma_pred[5] <- sigma(fc_garch)[1] # Desviación estándar condicional (Volatilidad)
+  
+  # --- BLOQUE C: Construcción de la Matriz de Covarianza (Sigma) ---
+  # Usamos la descomposición del enunciado (Ec. 6): Sigma_t = D_t * R * D_t
+  
+  # 1. Matriz Diagonal de Desviaciones Estándar (D_t)
+  D_t <- diag(sigma_pred)
+  
+  # 2. Matriz de Correlación Constante (R) obtenida en entrenamiento
+  R <- models$R
+  
+  # 3. Cálculo final de Sigma
+  Sigma_pred <- D_t %*% R %*% D_t
+  
+  # Devolver resultados
+  return(list(mu = mu_pred, Sigma = Sigma_pred))
+}
+```
+
+```{r}
+# Prueba rápida con los datos de entrenamiento originales
+test_output <- oneStepAhead(data_train, fitted_models)
+
+print("--- Pronóstico para t+1 ---")
+print("Retornos Esperados (mu):")
+print(test_output$mu)
+print("Matriz de Covarianza (Sigma):")
+print(test_output$Sigma)
+```
+
