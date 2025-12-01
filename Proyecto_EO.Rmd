@@ -88,7 +88,6 @@ X5: El p-value es bajo (< 0.05). Los retornos al cuadrado tienen autocorrelació
 Esto significa que X5 requiere un modelo GARCH para estimar su riesgo variable. Los demás usarán varianza muestral constante.
 
 
-
 ```{r}
 library(forecast)
 library(rugarch)
