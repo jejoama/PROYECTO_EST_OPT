@@ -1,0 +1,21 @@
+---
+title: "Proyecto"
+output: html_document
+date: "2025-12-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# EXTRACCIÓN DEL DATATSET
+
+```{r}
+train <- read.csv("stock_returns_train.csv")
+
+# Serie temporal
+train_serie <- ts(train)
+summary(train_serie)
+
+```
+
