@@ -188,3 +188,24 @@ head(mu_hat)
 head(se_hat)
 ```
 
+
+
+
+2.4 Función oneStepAhead
+```{r}
+oneStepAhead <- function(Xtrain, Xtest_past, getPredFunc){
+  n <- ncol(Xtrain)
+  mu_hat <- numeric(n_assets)
+  se_hat <- numeric(n_assets)
+  
+  for (i in 1:n){
+    pred <- do.call(getPredFunc, list(Xtrain[,i], Xtest_past[,i]))
+    mu_hat[i] <- pred$mu_hat
+    se_hat[i] <- pred$se_hat
+  }
+  
+  return(list(mu_hat = mu_hat, se_hat = se_hat))
+}
+
+```
+
