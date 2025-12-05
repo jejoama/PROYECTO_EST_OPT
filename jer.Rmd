@@ -151,3 +151,40 @@ print(paste("MAPE promedio:", round(mape,4)))
 
 ```
 
+
+
+
+
+2.3
+```{r}
+# Función recursiva para aplicar getPred en todo el test
+getPred_ts <- function(Xtrain, Xtest, getPredFunc){
+  H <- nrow(Xtest)         # número de periodos en test
+  mu_hat <- matrix(NA, H, 5)  # matriz de valores esperados
+  se_hat <- matrix(NA, H, 5)  # matriz de varianzas
+  X_test_past <- Xtest[0,]    # inicializamos vacío
+
+  for (h in seq_len(H)) {
+    for (i in 1:5){
+      # pronóstico para activo i en instante h
+      pred <- do.call(getPredFunc, list(Xtrain[,i], X_test_past[,i]))
+      mu_hat[h,i] <- pred$mu_hat
+      se_hat[h,i] <- pred$se_hat
+    }
+    # actualizamos histórico con el dato observado en test
+    X_test_past <- Xtest[1:h,,drop=FALSE]
+  }
+  return(list(mu_hat=mu_hat, se_hat=se_hat))
+}
+
+# Ejecut
+res <- getPred_ts(Xtrain, Xtest, getPred)
+
+mu_hat <- res$mu_hat   # valores esperados
+se_hat <- res$se_hat   # varianzas
+
+
+head(mu_hat)
+head(se_hat)
+```
+
