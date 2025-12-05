@@ -1,0 +1,153 @@
+---
+title: "Jer"
+output: html_document
+date: "2025-12-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# EXTRACCIÓN DEL DATATSET
+
+```{r}
+train <- read.csv("stock_returns_train_2.csv")
+
+# Serie temporal
+train_serie <- ts(train)
+summary(train_serie)
+
+```
+
+#DIVISIÓN TRAIN vs. TEST
+
+```{r}
+filas_train <- nrow(train)
+
+#Hemos pensando en dividirlo en 80% train vs 20% Test
+
+#Entrenamiento --> 96 primeros
+Xtrain <- window(train_serie, start=1, end=floor(0.8*filas_train))
+
+# Validación: 24 ultimos
+Xtest <- window(train_serie, start=floor(0.8*filas_train)+1, end=filas_train)
+
+```
+
+
+
+PASO 2
+Nos pide tanto la varianza como el valor esperado de neustra estimación. Haciendolo de modo que en nuestro tiempo t, cojamos todo lo del pasado --> t-1... --> para ello Modelo ARIMA
+```{r}
+library(forecast)  
+library(FinTS)    
+
+# Modelo arima para el activo 1: x1
+for (i in 1:ncol(train_serie)){
+  x_train <- Xtrain[,i]  
+  
+  fit_arima <- auto.arima(x_train, seasonal = FALSE)
+
+  #Ljung-Box sobre los residuos - (autocorrelación hasta lag=20)
+  Box_test <- Box.test(residuals(fit_arima), lag=20, type="Ljung-Box")
+  
+  
+  #ARCH sobre los residuos ---
+  arch_test <- ArchTest(residuals(fit_arima), lags=20)
+  print(Box_test)
+  print(arch_test)
+  print("--------------")
+}
+
+```
+
+
+
+
+MODELO ARIMA
+```{r}
+getPred <- function(x_train, x_test_past){
+  # Modelo ARIMA simple
+  mod <- arima(x_train, order=c(1,0,0))
+  x_past <- c(x_train, x_test_past)
+  fit_upd <- forecast::Arima(x_past, model = mod)
+  fc <- forecast::forecast(fit_upd, h = 1)
+
+  mu_hat <- as.numeric(fc$mean[1])
+  z80 <- qnorm(0.8)
+  se_from_up <- (fc$upper[,"80%"][1] - fc$mean[1]) / z80
+  se_from_lo <- (fc$mean[1] - fc$lower[,"80%"][1]) / z80
+  se_hat <- as.numeric(pmax(se_from_up, se_from_lo))
+
+  return(list(mu_hat=mu_hat, se_hat=se_hat))
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+2.2
+```{r}
+getPred_ts <- function(Xtrain, Xtest, getPredFunc){
+  H <- nrow(Xtest)
+  mu_hat <- matrix(NA, H, 5)
+  se_hat <- matrix(NA, H, 5)
+  X_test_past <- Xtest[0,]
+
+  for (h in seq_len(H)) {
+    for (i in 1:5){
+      pred <- do.call(getPredFunc, list(Xtrain[,i], X_test_past[,i]))
+      mu_hat[h,i] <- pred$mu_hat
+      se_hat[h,i] <- pred$se_hat
+    }
+    X_test_past <- Xtest[1:h,,drop=FALSE]
+  }
+  return(list(mu_hat=mu_hat, se_hat=se_hat))
+}
+
+# Ejecutar predicciones
+res <- getPred_ts(Xtrain, Xtest, getPred)
+mu_hat <- res$mu_hat
+se_hat <- res$se_hat
+res
+mu_hat
+se_hat
+
+```
+
+
+aplicacion de la funcion que hemos definido a mis datis 
+```{r}
+# Usamos la función auxiliar de los ejemplos
+res <- getPred_ts(Xtrain, Xtest, getPred)
+
+# Guardamos resultados
+mu_hat <- res$mu_hat   # valores esperados
+se_hat <- res$se_hat   # varianzas
+head(mu_hat)
+head(se_hat)
+
+# Revisar dimensiones
+dim(mu_hat)  # debería ser (nrow(Xtest), 5)
+dim(se_hat)  # igual
+
+```
+
+```{r}
+mape <- mean(abs(Xtest - mu_hat) / abs(Xtest))
+print(paste("MAPE promedio:", round(mape,4)))
+
+```
+
