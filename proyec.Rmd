@@ -11,12 +11,13 @@ knitr::opts_chunk$set(echo = TRUE)
 # EXTRACCIÓN DEL DATATSET
 
 ```{r}
-train <- read.csv("stock_returns_train.csv")
+train <- read.csv("stock_returns_train_2.csv")
 
 # Serie temporal
 train_serie <- ts(train)
 summary(train_serie)
 
+plot(train_serie)
 ```
 
 #DIVISIÓN TRAIN vs. TEST
