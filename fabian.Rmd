@@ -1,0 +1,11 @@
+---
+title: "pr_fabian"
+author: "Fabián Calvo Castillo"
+date: "2025-12-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
