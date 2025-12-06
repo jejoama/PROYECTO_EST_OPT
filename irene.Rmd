@@ -1,0 +1,74 @@
+---
+title: "proyecto"
+output: html_document
+date: "2025-12-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# APARTADO 3: Utilidad Media-Varianza
+Queremos averiguar cuánto queremos invertir en cada activo (calcular \alpha_t) para t= T+1,..., T+r. Para ello tenemos que optimizar la función UMV(alpha_t) donde, en este primer apartado, alpha puede tomar valores negativos (tomar una posición corta).
+
+Primero vamos a calcular la matriz de covarianza de los rendimientos de los 5 activos \Sigma_t=DRD, donde D es la matriz diagonal con las desviaciones estándar de cada activo y R es la matriz de correlación.
+```{r}
+sd <- apply(Xtrain, 2, sd) # desviación estándar de cada activo (el 2 para que aplique sobre cada columna)
+D <- diag(sd)
+R <- cor(Xtrain)
+Sigma_t <- D %*% R %*% D
+print(Sigma_t)
+```
+
+Ahora vamos a determinar los \alpha_t usando UMV.
+\mu_t son los valores esperados de los rendimientos del apartado anterior.
+```{r}
+UMV <- function(alpha, mu, gamma, sigma){
+  E_R <- t(alpha) %*% mu # valor esperado del rendimiento
+  V_R <- t(alpha) %*% sigma %*% alpha # varianza del rendimiento
+  umv <- E_R-gamma/2*V_R # utilidad media-varianza
+  # gamma pequeño, mayor riesgo para obtener mayor rendimiento
+  return(as.numeric(umv))
+}
+
+# maximizando UMV (queremos mayor rendimiento, menor riesgo), obtenemos alpha
+alpha_opt <- function(gamma, sigma, mu){
+  vec <- rep(1, 5)
+  lambda <- (t(vec) %*% solve(sigma) %*% mu - gamma)/(t(vec) %*% solve(sigma) %*% vec)
+  alpha <- 1/gamma*solve(sigma) %*% (mu-as.numeric(lambda)*vec)
+  return(as.numeric(alpha))
+}
+```
+
+Calculamos alpha_t para cada periodo
+```{r}
+matriz_alpha <- matrix(NA, nrow=nrow(mu_hat), ncol=5)
+
+# para gamma=1
+for (i in 1:nrow(mu_hat)){
+  matriz_alpha[i,] <- alpha_opt(1, Sigma_t, mu_hat[i,])
+}
+head(matriz_alpha)
+```
+
+Calculamos el rendimiento R
+```{r}
+R_t <- rep(NA, nrow(mu_hat))
+
+for (i in 1:nrow(mu_hat)){
+  R_t[i] <- sum(matriz_alpha[i,]*Xtest[i,])
+}
+R_t <- R_t/100
+print(R_t)
+```
+
+Rendimiento total
+```{r}
+I0 <- 100 # inversión inicial
+R <- I0*cumprod(1+R_t)
+print(R)
+```
+
+
+
