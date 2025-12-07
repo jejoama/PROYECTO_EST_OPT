@@ -1,0 +1,279 @@
+
+# Análisis
+1) Vamos a ver el comportamiento de los datos:
+```{r}
+# Cargar las bibliotecas necesarias
+library(ggplot2)
+library(tseries)
+library(forecast)
+
+# Cargar los datos desde un archivo CSV
+data <- read.csv("stock_returns_train.csv")
+
+# Convertir los datos a una serie temporal
+# Suponiendo que cada columna es una serie temporal
+X <- ts(data, start = c(2000, 1), frequency = 12)  # Aquí ajusta el 'start' y 'frequency' según corresponda
+
+# Graficar las series temporales
+par(mfrow=c(2, 3))  # Configura una cuadrícula de gráficos
+plot(X[, 1], main="Serie X1", ylab="Valor", xlab="Tiempo")
+plot(X[, 2], main="Serie X2", ylab="Valor", xlab="Tiempo")
+plot(X[, 3], main="Serie X3", ylab="Valor", xlab="Tiempo")
+plot(X[, 4], main="Serie X4", ylab="Valor", xlab="Tiempo")
+plot(X[, 5], main="Serie X5", ylab="Valor", xlab="Tiempo")
+
+# Descomponer la primera serie (X1) como ejemplo
+decomposed_X1 <- decompose(X[, 1])
+
+# Graficar la descomposición
+plot(decomposed_X1)
+
+# Realizar la prueba de Dickey-Fuller Aumentada para la primera serie
+adf.test(X[, 1])
+
+# Graficar ACF y PACF para la primera serie (X1)
+acf(X[, 1], main="ACF - X1")
+pacf(X[, 1], main="PACF - X1")
+
+# Ajustar el modelo ARIMA automáticamente
+fit_X1 <- auto.arima(X[, 1])
+
+# Ver el resumen del modelo
+summary(fit_X1)
+
+# Graficar los residuos del modelo ajustado
+tsdisplay(residuals(fit_X1), main="Residuos del Modelo ARIMA")
+
+
+```
+Los resultados de la prueba de Dickey-Fuller Aumentada (ADF) con el valor negativo indican que hay evidencia en contra de la hipótesis nula (es decir, que no es estacionaria). Con el p_value a 0.01 rechazamos la hipótesis de que sea una serie no estacionaria.
+
+
+El modelo ARIMA Ajustado es ARIMA (0,0,0), pues no se aprecian componentes autorregresivos (AR) ni medias móviles (MA). 
+
+
+# Pruebas
+############################################################################
+############################################################################
+############################################################################
+############################################################################
+Esta es una prueba con funciones mínimas para ver el comportamiento del código
+
+```{r}
+
+library(forecast)
+
+func_dir <- "funciones-ejemplo-evaluacion-20251201/"
+
+source(paste0(func_dir, "eval_funcs.R"))
+source(paste0(func_dir, "example_funcs.R"))
+
+
+data <- read.csv("stock_returns_train.csv")
+X <- as.matrix(data)
+
+# separar en train / test (ejemplo 80% / 20%)
+Ttrain <- floor(0.8 * nrow(X))
+Xtrain <- X[1:Ttrain, ]
+Xtest  <- X[(Ttrain+1):nrow(X), ]
+
+pred <- getPred_ts(
+  Xtrain = Xtrain,
+  Xtest  = Xtest,
+  getPredFunc = getPred000
+)
+
+mu_hat <- pred$mu_hat
+se_hat <- pred$se_hat
+
+############
+# Esta implementación pone alphas aleatorias para ver su comportamiento
+############
+set.seed(123)
+
+alpha_hat_rand <- getAlpha_ts(
+  mus = mu_hat,
+  sigs = se_hat,
+  gamma = 1,   # no importa para random
+  getSigmaFunc = getSigmaDiag,
+  getAlphaFunc = getAlphaRandom,
+  Xtrain = Xtrain,
+  Xtest  = Xtest
+)
+
+# Checar restricciones
+pass_rand <- getChecks(alpha_hat_rand, mode = c("sum1"))
+pass_rand
+
+# Rendimiento del portafolio
+ret_rand <- getRet(alpha_hat_rand, Xtest, pass_rand)
+ret_rand
+
+# Utilidad Mean–Variance (baseline)
+gamma_mv <- 5
+
+Urel_rand_mv <- getUEval(
+  alpha_hat = alpha_hat_rand,
+  mu_hat = mu_hat,
+  se_hat = se_hat,
+  Xtrain = Xtrain,
+  Xtest = Xtest,
+  gamma = gamma_mv,
+  passChecks = pass_rand,
+  Ufunc = Umv
+)
+
+Urel_rand_mv
+
+# Versión aleatoria POSITIVA
+
+alpha_hat_rand_pos <- getAlpha_ts(
+  mus = mu_hat,
+  sigs = se_hat,
+  gamma = 1,
+  getSigmaFunc = getSigmaDiag,
+  getAlphaFunc = getAlphaRandomPos,
+  Xtrain = Xtrain,
+  Xtest  = Xtest
+)
+
+pass_rand_pos <- getChecks(
+  alpha_hat_rand_pos,
+  mode = c("sum1","pos")
+)
+
+# Comparar rendimiento
+ret_rand_pos <- getRet(alpha_hat_rand_pos, Xtest, pass_rand_pos)
+
+Urel_rand_pos <- getUEval(
+  alpha_hat = alpha_hat_rand_pos,
+  mu_hat = mu_hat,
+  se_hat = se_hat,
+  Xtrain = Xtrain,
+  Xtest = Xtest,
+  gamma = gamma_mv,
+  passChecks = pass_rand_pos,
+  Ufunc = Umv
+)
+
+list(
+  ret_sin_pos = ret_rand,
+  ret_pos = ret_rand_pos,
+  Urel_sin_pos = Urel_rand_mv,
+  Urel_pos = Urel_rand_pos
+)
+
+```
+
+
+
+
+
+
+Ahora se implemtentará el mismo código, pero en lugar de Alphas aleatorias, se itulizará getAlphaMVPos:
+
+
+```{r}
+library(forecast)
+
+func_dir <- "funciones-ejemplo-evaluacion-20251201/"
+
+source(paste0(func_dir, "eval_funcs.R"))
+source(paste0(func_dir, "example_funcs.R"))
+
+
+data <- read.csv("stock_returns_train.csv")
+X <- as.matrix(data)
+
+# separar en train / test (ejemplo 80% / 20%)
+Ttrain <- floor(0.8 * nrow(X))
+Xtrain <- X[1:Ttrain, ]
+Xtest  <- X[(Ttrain+1):nrow(X), ]
+
+pred <- getPred_ts(
+  Xtrain = Xtrain,
+  Xtest  = Xtest,
+  getPredFunc = getPred000
+)
+
+mu_hat <- pred$mu_hat
+se_hat <- pred$se_hat
+
+############
+# Esta implementación pone alphas aleatorias para ver su comportamiento
+############
+set.seed(123)
+
+alpha_hat_rand <- getAlpha_ts(
+  mus = mu_hat,
+  sigs = se_hat,
+  gamma = 1,   # no importa para random
+  getSigmaFunc = getSigmaDiag,
+  getAlphaFunc = getAlphaRandom,
+  Xtrain = Xtrain,
+  Xtest  = Xtest
+)
+
+# Checar restricciones
+pass_rand <- getChecks(alpha_hat_rand, mode = c("sum1"))
+pass_rand
+
+# Rendimiento del portafolio
+ret_rand <- getRet(alpha_hat_rand, Xtest, pass_rand)
+ret_rand
+
+# Utilidad Mean–Variance (baseline)
+gamma_mv <- 5
+
+Urel_rand_mv <- getUEval(
+  alpha_hat = alpha_hat_rand,
+  mu_hat = mu_hat,
+  se_hat = se_hat,
+  Xtrain = Xtrain,
+  Xtest = Xtest,
+  gamma = gamma_mv,
+  passChecks = pass_rand,
+  Ufunc = Umv
+)
+
+Urel_rand_mv
+
+# Versión aleatoria POSITIVA
+
+alpha_hat_rand_pos <- getAlpha_ts(
+  mus = mu_hat,
+  sigs = se_hat,
+  gamma = 1,
+  getSigmaFunc = getSigmaDiag,
+  getAlphaFunc = getAlphaMVPos,
+  Xtrain = Xtrain,
+  Xtest  = Xtest
+)
+
+pass_rand_pos <- getChecks(
+  alpha_hat_rand_pos,
+  mode = c("sum1","pos")
+)
+
+# Comparar rendimiento
+ret_rand_pos <- getRet(alpha_hat_rand_pos, Xtest, pass_rand_pos)
+
+Urel_rand_pos <- getUEval(
+  alpha_hat = alpha_hat_rand_pos,
+  mu_hat = mu_hat,
+  se_hat = se_hat,
+  Xtrain = Xtrain,
+  Xtest = Xtest,
+  gamma = gamma_mv,
+  passChecks = pass_rand_pos,
+  Ufunc = Umv
+)
+
+list(
+  ret_sin_pos = ret_rand,
+  ret_pos = ret_rand_pos,
+  Urel_sin_pos = Urel_rand_mv,
+  Urel_pos = Urel_rand_pos
+)
+
+```
