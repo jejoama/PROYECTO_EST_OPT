@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 train <- read.csv("stock_returns_train_2.csv")
 
 # Serie temporal
-train_serie <- ts(train)
+train_serie <- ts(train/100)
 summary(train_serie)
 
 ```
@@ -283,21 +283,35 @@ print(R)
 
 # obtener alpha_t en funcion de mu_t, sig_t, gamma y la funcion Sigma(sig_t, Xpast) elegida
 getAlpha <- function(mu,sig, gamma, getSigmaFunc, getAlphaFunc, Xpast){
+  print('GET ALPHA')
   Sigma <- do.call(getSigmaFunc, list(sig, Xpast))
   alpha <- do.call(getAlphaFunc, list(mu, Sigma, gamma))
+  print(alpha)
   return(alpha)  
 }
 
 # obtener alpha para todo periodo de test
 getAlpha_ts <- function(mus, sigs, gamma, getSigmaFunc, getAlphaFunc, Xtrain, Xtest){
+  print('GET ALPHA TS')
   H <- nrow(Xtest)
+  #cat('H:',H,'\n')
   alpha_hat <- matrix(NA, H, 5)
+  #cat('alpha_hat_0\n')
+  #print(alpha_hat)
   Xpast <- as.matrix(Xtrain)
   for (h in seq_len(H)) {
     alpha_hat[h,] <- getAlpha(mus[h,], sigs[h,], gamma, getSigmaFunc, getAlphaFunc, Xpast)
     dato_hoy<-as.matrix(Xtest[h,])
     Xpast <- rbind(Xpast, Xtest[h,])
+    print('Xpast')
+    print(Xpast)
+    print('Xtest')
+    print(Xtest)
+    #cat('Alpha_hat_seq\n')
+    #print(alpha_hat[h,])
   }  
+  #cat('Alpha_hat_seq\n')
+  #print(alpha_hat)
   return(alpha_hat)
 }
 
@@ -329,7 +343,12 @@ getRet <- function(alpha_hat, Xtest, passChecks){
 getSigmaMV <- function(sig, Xpast){
   R <- cor(Xpast, use="pairwise.complete.obs") 
   D <- diag(sig)  
+  print('D')
+  print(D)
+  print('R')
+  print(R)
   Sigma <- D %*% R %*% D
+  print(Sigma)
   return(Sigma)
 }
 
@@ -431,13 +450,9 @@ print(paste("Rendimiento Final Acumulado:", round(ret_3_2 * 100, 2), "%"))
 ## Log-utilidad
 ```{r}
 Ulog <- function(alpha, mu, gamma, Sigma){
-  #print('alpha')
-  #print(alpha)
-  #print('mu')
-  #print(mu)
-  ulog <- log(1+t(alpha)%*%mu) - gamma*t(alpha)%*%Sigma%*%alpha/(2*(1+t(alpha)%*%mu)^2)
-  #print('ulog')
-  #print(ulog)
+  num <- log(1+t(alpha)%*%mu) - gamma*t(alpha)%*%Sigma%*%alpha
+  denom <- (2*(1+t(alpha)%*%mu)^2)
+  ulog <- num/denom
   
   return(as.numeric(ulog))
 }
@@ -457,7 +472,8 @@ ejemplo_optim <- function(x,y,z){
 }
 
 # Optimizamos comprobando la penalización
-Alpha_logU <- function(mu_t, Sigma_t, gamma_t){
+Alpha_logU <- function(mu_t, Sigma, gamma_t){
+  print(mu_t)
   rho <- 1
   ver_alpha <- TRUE
   alpha_0 <- rep(1,5)/5
@@ -477,10 +493,18 @@ Alpha_logU <- function(mu_t, Sigma_t, gamma_t){
       rho <- 10*rho
     }
   }
-  print('a')
-  #print(alpha)
+  return(alpha)
 }
 
+a_log <- getAlpha_ts(mu_hat, se_hat, gamma_param, getSigmaMV, Alpha_logU, Xtrain, Xtest)
+
+check_log <- getChecks(a_log, mode=c("sum1"))
+ret_log <- getRet(a_log, Xtest, check_log)
+print(paste("Rendimiento Final Acumulado:", round(ret_log * 100, 2), "%"))
+```
+
+
+```{r}
 # Obtengo alpha para la log-utilidad
 ## voy a asumir que la sigma se obtiene de la misma forma así que lo único que cambia es la función para obtener alpha
 alpha_lu <- getAlpha_ts(
@@ -492,5 +516,6 @@ alpha_lu <- getAlpha_ts(
   Xtrain = Xtrain, 
   Xtest = Xtest
 )
+getAlphaRandomPos(mu_hat, se_hat, gamma_param)
 ```
 
