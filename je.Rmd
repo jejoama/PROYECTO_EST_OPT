@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 
-
+#
 
 teamName <- "GrupoJILFC"
 # integrante 1: Aguilar Marin, Jeremy Joel
@@ -26,15 +26,14 @@ teamName <- "GrupoJILFC"
 train <- read.csv("stock_returns_train_2.csv")
 
 # Serie temporal
-train_serie <- ts(train)
 train_serie<- ts(train/100)
-summary(train_serie)
 
 ```
 
-# División Train vs Test
 
 ```{r}
+# División Train vs Test
+
 filas_train <- nrow(train)
 
 #Hemos pensando en dividirlo en 80% train vs 20% Test
@@ -46,6 +45,8 @@ Xtrain <- window(train_serie, start=1, end=floor(0.8*filas_train))
 Xtest <- window(train_serie, start=floor(0.8*filas_train)+1, end=filas_train)
 
 ```
+```
+
 
 PASO 2
 Nos pide tanto la varianza como el valor esperado de neustra estimación. Haciendolo de modo que en nuestro tiempo t, cojamos todo lo del pasado --> t-1... --> para ello Modelo ARIMA
@@ -70,6 +71,7 @@ for (i in 1:ncol(train_serie)){
 ##########################
 # seccion 2 - prediccione
 ##########################
+###  
 
 # Funcion para predecir UN activo para el periodo test en el momento t
 ```{r}
@@ -113,9 +115,10 @@ getPred_ts<- function(Xtrain, Xtest, getPredFunc){
 }
 
 # Ejecutar predicciones
+set.seed(43)
 res <- getPred_ts(Xtrain, Xtest, getPred)
-mu_hat <- res$mu_hat
-se_hat <- res$se_hat
+mu_hat = res$mu_hat
+se_hat = res$se_hat
 
 ```
 
@@ -283,5 +286,84 @@ print(paste("¿Cumple restricciones (Suma=1 y Positivos)?:", check_3_2))
 
 ret_3_2 <- getRet(alpha_3_2, Xtest, check_3_2)
 print(paste("Rendimiento Final Acumulado:", round(ret_3_2 * 100, 2), "%"))
+```
+
+
+
+```{r}
+source("eval_funcs.R")
+
+
+############################################
+# SECCIÓN 4 — UTILIDAD LOG (CON CORTOS)
+############################################
+
+# 4.1 Matriz de covarianzas: Sigma = D R D
+getSigmaLog <- function(sig, Xpast){
+  R <- cor(Xpast, use = "pairwise.complete.obs")
+  D <- diag(sig)
+  Sigma <- D %*% R %*% D
+  return(Sigma)
+}
+
+# 4.2 Optimización de la utilidad logarítmica (permitiendo cortos)
+getAlphaLog <- function(mu, Sigma, gamma){
+
+  n <- length(mu)
+  vec <- rep(1, n)
+
+  invSigma <- solve(Sigma)
+
+  # Lagrange multiplier
+  lambda <- (t(vec) %*% invSigma %*% mu - gamma) /
+            (t(vec) %*% invSigma %*% vec)
+
+  # Alpha óptimo
+  alpha <- (1/gamma) * invSigma %*% (mu - as.numeric(lambda) * vec)
+
+  return(as.numeric(alpha))
+}
+
+# 4.3 Parámetro gamma
+gammaLog <- 1
+
+############################################
+# EJECUCIÓN DEL APARTADO 4
+############################################
+
+print("--- RESULTADOS APARTADO 4 (UTILIDAD LOG) ---")
+
+alpha_log <- getAlpha_ts(
+  mus = mu_hat,
+  sigs = se_hat,
+  gamma = gammaLog,
+  getSigmaFunc = getSigmaLog,
+  getAlphaFunc = getAlphaLog,
+  Xtrain = Xtrain,
+  Xtest = Xtest
+)
+
+# Solo se exige suma=1 (permitimos cortos)
+check_log <- getChecks(alpha_log, mode = c("sum1"))
+print(paste("¿Cumple restricciones (suma=1)?:", check_log))
+
+# Rendimiento acumulado
+ret_log <- getRet(alpha_log, Xtest, check_log)
+print(paste("Rendimiento Final Acumulado:", round(ret_log * 100, 2), "%"))
+
+
+# Utilidad log relativa (comparada con alpha igual)
+Ulog_rel <- getUEval(
+  alpha_log, mu_hat, se_hat,
+  Xtrain, Xtest,
+  gammaLog, getSigmaLog,
+  check_log, Ulog
+)
+
+# ✅ Añadir al vector evals como hace el profesor
+evals <- c(evals, retLog = ret_log)
+evals <- c(evals, Ulog = Ulog_rel)
+
+
 ```
 
