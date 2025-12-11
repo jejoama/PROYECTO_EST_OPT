@@ -1,6 +1,6 @@
 ---
-title: "Proy"
-author: "Lucía Benages Guijarro"
+title: "pr_fabian"
+author: "Fabián Calvo Castillo"
 date: "2025-12-06"
 output: html_document
 ---
@@ -9,18 +9,27 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# EXTRACCIÓN DEL DATATSET
+teamName <- "GrupoJILFC"
+# integrante 1: Aguilar Marin, Jeremy Joel
+# integrante 2: Barba La Orden, Irene
+# integrante 3: Benages Guijarro, Lucía
+# integrante 4: Calvo Castillo, Fabián
+# integrante 5: Torrico Castellon, Cristhian
+
+
+# Extracción del Dataset
 
 ```{r}
 train <- read.csv("stock_returns_train_2.csv")
 
 # Serie temporal
-train_serie <- ts(train/100)
+train_serie <- ts(train)
+train_serie<- ts(train/100)
 summary(train_serie)
 
 ```
 
-#DIVISIÓN TRAIN vs. TEST
+# División Train vs Test
 
 ```{r}
 filas_train <- nrow(train)
@@ -35,25 +44,18 @@ Xtest <- window(train_serie, start=floor(0.8*filas_train)+1, end=filas_train)
 
 ```
 
-
-
 PASO 2
 Nos pide tanto la varianza como el valor esperado de neustra estimación. Haciendolo de modo que en nuestro tiempo t, cojamos todo lo del pasado --> t-1... --> para ello Modelo ARIMA
 ```{r}
 library(forecast)  
 library(FinTS)    
 
-# Modelo arima para el activo 1: x1
 for (i in 1:ncol(train_serie)){
   x_train <- Xtrain[,i]  
-  
   fit_arima <- auto.arima(x_train, seasonal = FALSE)
 
-  #Ljung-Box sobre los residuos - (autocorrelación hasta lag=20)
   Box_test <- Box.test(residuals(fit_arima), lag=20, type="Ljung-Box")
   
-  
-  #ARCH sobre los residuos ---
   arch_test <- ArchTest(residuals(fit_arima), lags=20)
   print(Box_test)
   print(arch_test)
@@ -62,55 +64,38 @@ for (i in 1:ncol(train_serie)){
 
 ```
 
-MODELO ARIMA
+##########################
+# seccion 2 - predicciones
+##########################
+
+# Funcion para predecir UN activo para el periodo test en el momento t
 ```{r}
-# getPred <- function(x_train, x_test_past){
-#   # Modelo ARIMA simple
-#   mod <- arima(x_train, order=c(1,0,0))
-#   x_past <- c(x_train, x_test_past)
-#   fit_upd <- forecast::Arima(x_past, model = mod)
-#   fc <- forecast::forecast(fit_upd, h = 1)
-# 
-#   mu_hat <- as.numeric(fc$mean[1])
-#   z80 <- qnorm(0.8)
-#   se_from_up <- (fc$upper[,"80%"][1] - fc$mean[1]) / z80
-#   se_from_lo <- (fc$mean[1] - fc$lower[,"80%"][1]) / z80
-#   se_hat <- as.numeric(pmax(se_from_up, se_from_lo))
-# 
-#   return(list(mu_hat=mu_hat, se_hat=se_hat))
-# }
-
 getPred <- function(x_train, x_test_past){
-  
   x_past <- c(x_train, x_test_past)
-
   fit <- auto.arima(x_past, seasonal = FALSE, stationary = TRUE)
-  
   fc <- forecast::forecast(fit, h = 1)
-  
   mu_hat <- as.numeric(fc$mean)
-  
   var_hat <- fit$sigma2 
-  
   se_hat <- sqrt(fit$sigma2) 
-
   return(list(mu_hat = mu_hat, se_hat = se_hat))
 }
-
 ```
 
 
 2.2
 ```{r}
-getPred_ts <- function(Xtrain, Xtest, getPredFunc){
+getPred_ts<- function(Xtrain, Xtest, getPredFunc){
+  
   H <- nrow(Xtest)
   mu_hat <- matrix(NA, H, 5)
   se_hat <- matrix(NA, H, 5)
-  X_test_past <- Xtest[0,]
 
+  X_test_past <- Xtest[0,]
+  print(paste("dim X test past: ", dim(X_test_past)))
   for (h in seq_len(H)) {
     for (i in 1:5){
-      pred <- do.call(getPredFunc, list(Xtrain[,i], X_test_past[,i]))
+      # update model state with data up to t-1 (parameters fixed)
+      pred = do.call(getPredFunc, list(Xtrain[,i], X_test_past[,i]))
       mu_hat[h,i] <- pred$mu_hat
       se_hat[h,i] <- pred$se_hat
     }
@@ -129,153 +114,17 @@ se_hat
 
 ```
 
-
-aplicacion de la funcion que hemos definido a mis datis 
-```{r}
-# Usamos la función auxiliar de los ejemplos
-res <- getPred_ts(Xtrain, Xtest, getPred)
-
-# Guardamos resultados
-mu_hat <- res$mu_hat   # valores esperados
-se_hat <- res$se_hat   # varianzas
-head(mu_hat)
-head(se_hat)
-
-# Revisar dimensiones
-dim(mu_hat)  # debería ser (nrow(Xtest), 5)
-dim(se_hat)  # igual
-
-```
-
 ```{r}
 mape <- mean(abs(Xtest - mu_hat) / abs(Xtest))
 print(paste("MAPE promedio:", round(mape,4)))
 
 ```
 
-2.3
-```{r}
-# Función recursiva para aplicar getPred en todo el test
-getPred_ts <- function(Xtrain, Xtest, getPredFunc){
-  H <- nrow(Xtest)         # número de periodos en test
-  mu_hat <- matrix(NA, H, 5)  # matriz de valores esperados
-  se_hat <- matrix(NA, H, 5)  # matriz de varianzas
-  X_test_past <- Xtest[0,]    # inicializamos vacío
-
-  for (h in seq_len(H)) {
-    for (i in 1:5){
-      # pronóstico para activo i en instante h
-      pred <- do.call(getPredFunc, list(Xtrain[,i], X_test_past[,i]))
-      mu_hat[h,i] <- pred$mu_hat
-      se_hat[h,i] <- pred$se_hat
-    }
-    # actualizamos histórico con el dato observado en test
-    X_test_past <- Xtest[1:h,,drop=FALSE]
-  }
-  return(list(mu_hat=mu_hat, se_hat=se_hat))
-}
-
-# Ejecut
-res <- getPred_ts(Xtrain, Xtest, getPred)
-
-mu_hat <- res$mu_hat   # valores esperados
-se_hat <- res$se_hat   # varianzas
-
-
-head(mu_hat)
-head(se_hat)
-```
-
-2.4 Función oneStepAhead
-```{r}
-oneStepAhead <- function(Xtrain, Xtest_past, getPredFunc){
-  n <- ncol(Xtrain)
-  mu_hat <- numeric(n_assets)
-  se_hat <- numeric(n_assets)
-  
-  for (i in 1:n){
-    pred <- do.call(getPredFunc, list(Xtrain[,i], Xtest_past[,i]))
-    mu_hat[i] <- pred$mu_hat
-    se_hat[i] <- pred$se_hat
-  }
-  
-  return(list(mu_hat = mu_hat, se_hat = se_hat))
-}
-
-```
-
-```{r}
-#Apartado Irene
-```
-# APARTADO 3: Utilidad Media-Varianza
-Queremos averiguar cuánto queremos invertir en cada activo (calcular \alpha_t) para t= T+1,..., T+r. Para ello tenemos que optimizar la función UMV(alpha_t) donde, en este primer apartado, alpha puede tomar valores negativos (tomar una posición corta).
-
-Primero vamos a calcular la matriz de covarianza de los rendimientos de los 5 activos \Sigma_t=DRD, donde D es la matriz diagonal con las desviaciones estándar de cada activo y R es la matriz de correlación.
-```{r}
-#sd <- apply(Xtrain, 2, sd) # desviación estándar de cada activo (el 2 para que aplique sobre cada columna)
-#D <- diag(sd)
-R <- cor(Xtrain)
-#Sigma_t <- D %*% R %*% D
-#print(Sigma_t)
-```
-
-Ahora vamos a determinar los \alpha_t usando UMV.
-\mu_t son los valores esperados de los rendimientos del apartado anterior.
-```{r}
-UMV <- function(alpha, mu, gamma, sigma){
-  E_R <- t(alpha) %*% mu # valor esperado del rendimiento
-  V_R <- t(alpha) %*% sigma %*% alpha # varianza del rendimiento
-  umv <- E_R-gamma/2*V_R # utilidad media-varianza
-  # gamma pequeño, mayor riesgo para obtener mayor rendimiento
-  return(as.numeric(umv))
-}
-
-# maximizando UMV (queremos mayor rendimiento, menor riesgo), obtenemos alpha
-alpha_opt <- function(gamma, sigma, mu){
-  vec <- rep(1, 5)
-  lambda <- (t(vec) %*% solve(sigma) %*% mu - gamma)/(t(vec) %*% solve(sigma) %*% vec)
-  alpha <- 1/gamma*solve(sigma) %*% (mu-as.numeric(lambda)*vec)
-  return(as.numeric(alpha))
-}
-```
-
-Calculamos alpha_t para cada periodo
-```{r}
-matriz_alpha <- matrix(NA, nrow=nrow(mu_hat), ncol=5)
-
-# # para gamma=1
-# for (i in 1:nrow(mu_hat)){
-#   matriz_alpha[i,] <- alpha_opt(1, Sigma_t, mu_hat[i,])
-# }
-# head(matriz_alpha)
-
-# para gamma=1
-for (i in 1:nrow(mu_hat)){
-  D <- diag(se_hat[i,])
-  Sigma_t <- D %*% R %*% D
-
-  matriz_alpha[i,] <- alpha_opt(1, Sigma_t, mu_hat[i,])
-}
-head(matriz_alpha)
-```
-
-Calculamos el rendimiento R
-```{r}
-R_t <- rep(NA, nrow(mu_hat))
-
-for (i in 1:nrow(mu_hat)){
-  R_t[i] <- sum(matriz_alpha[i,]*Xtest[i,])
-}
-R_t <- R_t/100
-print(R_t)
-```
-
-Rendimiento total
-```{r}
-I0 <- 100 # inversión inicial
-R <- I0*cumprod(1+R_t)
-print(R)
-```
+#####################################
+# seccion 3 - utilidad media-varianza
+###########################################################
+# 3.1 utilidad media-varianza, alfa_i positiva o negativa
+###########################################################
 
 
 ```{r}
@@ -283,35 +132,21 @@ print(R)
 
 # obtener alpha_t en funcion de mu_t, sig_t, gamma y la funcion Sigma(sig_t, Xpast) elegida
 getAlpha <- function(mu,sig, gamma, getSigmaFunc, getAlphaFunc, Xpast){
-  print('GET ALPHA')
   Sigma <- do.call(getSigmaFunc, list(sig, Xpast))
   alpha <- do.call(getAlphaFunc, list(mu, Sigma, gamma))
-  print(alpha)
   return(alpha)  
 }
 
 # obtener alpha para todo periodo de test
 getAlpha_ts <- function(mus, sigs, gamma, getSigmaFunc, getAlphaFunc, Xtrain, Xtest){
-  print('GET ALPHA TS')
   H <- nrow(Xtest)
-  #cat('H:',H,'\n')
   alpha_hat <- matrix(NA, H, 5)
-  #cat('alpha_hat_0\n')
-  #print(alpha_hat)
   Xpast <- as.matrix(Xtrain)
   for (h in seq_len(H)) {
     alpha_hat[h,] <- getAlpha(mus[h,], sigs[h,], gamma, getSigmaFunc, getAlphaFunc, Xpast)
     dato_hoy<-as.matrix(Xtest[h,])
     Xpast <- rbind(Xpast, Xtest[h,])
-    print('Xpast')
-    print(Xpast)
-    print('Xtest')
-    print(Xtest)
-    #cat('Alpha_hat_seq\n')
-    #print(alpha_hat[h,])
   }  
-  #cat('Alpha_hat_seq\n')
-  #print(alpha_hat)
   return(alpha_hat)
 }
 
@@ -343,13 +178,20 @@ getRet <- function(alpha_hat, Xtest, passChecks){
 getSigmaMV <- function(sig, Xpast){
   R <- cor(Xpast, use="pairwise.complete.obs") 
   D <- diag(sig)  
-  print('D')
-  print(D)
-  print('R')
-  print(R)
   Sigma <- D %*% R %*% D
-  print(Sigma)
   return(Sigma)
+}
+
+# APARTADO 3.1: Con Posiciones Cortas
+getAlphaMV <- function(mu, Sigma, gamma){
+  vec <- rep(1, length(mu))
+  invSigma <- solve(Sigma)
+  
+  # Cálculo de Lambda y Alpha óptimo
+  lambda <- (t(vec) %*% invSigma %*% mu - gamma) / (t(vec) %*% invSigma %*% vec)
+  alpha <- (1/gamma) * invSigma %*% (mu - as.numeric(lambda) * vec)
+  
+  return(as.numeric(alpha))
 }
 
 # Para el modelo MV Positivo (usualmente es la misma lógica de riesgo)
@@ -357,26 +199,15 @@ getSigmaMVPos <- function(sig, Xpast){
   return(getSigmaMV(sig, Xpast))
 }
 
-# APARTADO 3.1: Con Posiciones Cortas
-getAlphaRandom <- function(mu, Sigma, gamma){
-  vec <- rep(1, length(mu))
-  invSigma <- solve(Sigma)
-  
-  # Cálculo de Lambda y Alpha óptimo
-  lambda <- (t(vec) %*% invSigma %*% mu - gamma) / (t(vec) %*% invSigma %*% vec)
-  alpha <- (1/gamma) * invSigma %*% (mu - as.numeric(lambda) * vec)
-  print(as.numeric(alpha))
-  return(as.numeric(alpha))
-}
 
 # APARTADO 3.2: Sin Posiciones Cortas (Quadprog)
 library(quadprog)
 
-getAlphaRandomPos <- function(mu, Sigma, gamma){
+getAlphaMVPos <- function(mu, Sigma, gamma){
   n <- length(mu)
   
   # Configuración para solve.QP
-  Dmat <- gamma * Sigma #+ diag(1e-8, n) # Ajuste numérico
+  Dmat <- gamma * Sigma + diag(1e-8, n) # Ajuste numérico
   dvec <- mu
   Amat <- cbind(rep(1, n), diag(n))     # Restricciones: Suma=1, I>=0
   bvec <- c(1, rep(0, n))               # Valores: 1, 0, 0, 0...
@@ -397,7 +228,7 @@ getAlphaRandomPos <- function(mu, Sigma, gamma){
 
 ```{r}
 # Definimos Gamma (aversión al riesgo)
-gamma_param <- 1 
+gammaMV <- 1 
 
 # APARTADO 3.1: Optimización CON posiciones cortas
 print("--- RESULTADOS APARTADO 3.1 (CON CORTOS) ---")
@@ -406,9 +237,9 @@ print("--- RESULTADOS APARTADO 3.1 (CON CORTOS) ---")
 alpha_3_1 <- getAlpha_ts(
   mus = mu_hat, 
   sigs = se_hat, 
-  gamma = gamma_param,
+  gamma = gammaMV,
   getSigmaFunc = getSigmaMV, 
-  getAlphaFunc = getAlphaRandom, 
+  getAlphaFunc = getAlphaMV, 
   Xtrain = Xtrain, 
   Xtest = Xtest
 )
@@ -423,6 +254,8 @@ print(paste("Rendimiento Final Acumulado:", round(ret_3_1 * 100, 2), "%"))
 ```
 
 ```{r}
+gammaMVPos <- 1
+
 # APARTADO 3.2: Optimización SIN posiciones cortas (Solo largos)
 print(" ")
 print("--- RESULTADOS APARTADO 3.2 (SIN CORTOS) ---")
@@ -431,217 +264,103 @@ print("--- RESULTADOS APARTADO 3.2 (SIN CORTOS) ---")
 alpha_3_2 <- getAlpha_ts(
   mus = mu_hat, 
   sigs = se_hat, 
-  gamma = gamma_param,
-  getSigmaFunc = getSigmaMV,   
-  getAlphaFunc = getAlphaRandomPos,
+  gamma = gammaMVPos,
+  getSigmaFunc = getSigmaMVPos,   
+  getAlphaFunc = getAlphaMVPos,
   Xtrain = Xtrain, 
   Xtest = Xtest
 )
 
-
 check_3_2 <- getChecks(alpha_3_2, mode=c("sum1", "pos"))
 print(paste("¿Cumple restricciones (Suma=1 y Positivos)?:", check_3_2))
-
 
 ret_3_2 <- getRet(alpha_3_2, Xtest, check_3_2)
 print(paste("Rendimiento Final Acumulado:", round(ret_3_2 * 100, 2), "%"))
 ```
 
-## Log-utilidad
-
+################################################
+# seccion 4 - 
+# utilidad log, alfa_i positiva o negativa
+################################################
 ```{r}
-library(nloptr)
+# Pongo aquí la solución que funciona y más abajo los intentos de solución más global
+gammaLog = 1 # INSERTAR VALOR EN REALES
 
-opts <- list(
-  algorithm = "NLOPT_GN_MLSL_LDS",
-  maxeval = 2000,
-  local_opts = list(
-    algorithm = "NLOPT_LD_LBFGS", 
-    xtol_rel = 1e-8
-  )
-)
+# Funcion para estimar la matriz de covarianzas entre los rendimientos de los 5
+# activos a partir de las desviaciones estándares (que vendran de su modelo Arima)
+# y el historico de rendimientos (que pueden usar para estimar correlaciones) 
+getSigmaLog <- function(sig, Xpast){
+  Sigma <- getSigmaMV(sig, Xpast)
+  return(Sigma)
+}
 
-Ulog <- function(alpha, mu, gamma, Sigma){
-  num <- log(1+t(alpha)%*%mu) - gamma*t(alpha)%*%Sigma%*%alpha
-  denom <- (2*(1+t(alpha)%*%mu)^2)
-  ulog <- num/denom
+# Funcion para optimizar la asignacion de cada activo dentro del portafolio
+# tomando en cuenta la utilidad log CON posiciones cortas
+getAlphaLog <- function(mu,Sigma, gamma){
+  # INPUT: mu: vector en R^5 con los rendimientos esperados de los 5 activos para el periodo t
+  #        Sigma: matriz en R^{5 x 5} con las covarianzas de los 5 activos
+  #        gamma: valor en R que representa el apetito de riesgo. Entre mas bajo mas riesgo.
+  # OUTPUT: alpha: vector en R^5 con la asignación elegida para los 5 activos resultante de optimizar
+  # U-log sujeto a que alpha sume a 1.
   
-  return(as.numeric(ulog))
-}
-
-# Añadiendo un parámetro de penalización para la restricción sum(alpha)=1
-Ulog_penal <- function(alpha, mu, gamma, Sigma, penal){
-  ulog <- Ulog(alpha,mu,gamma,Sigma)
-  penal <- penal*(sum(alpha)-1)^2
+  #INSERTAR PASOS DE OPTIMIZACION
+  # Repetiremos la optimización hasta verificar que el alpha suma 1
+  comprobar_alpha <- TRUE
+  # Penalización para la restricción
+  penal <- 10
+  while(comprobar_alpha){
+    # Definición de la función a maximizar, con un parámetro de penalización
+    Ulog_penal <- function(alpha){
+      num <- log(1+t(alpha)%*%mu) - gamma*t(alpha)%*%Sigma%*%alpha
+      denom <- (2*(1+t(alpha)%*%mu)^2)
+      penal <- penal*(sum(alpha)-1)^2
   
-  return(as.numeric(ulog - penal))
-}
-
-# Prueba con una función sencilla
-ejemplo_optim <- function(x,y,z){
-  fun <- y*x^2 +z*x
-  return(fun)
-}
-
-# Optimizamos comprobando la penalización
-Alpha_logU <- function(mu_t, Sigma, gamma_t){
-  print(mu_t)
-  rho <- 1
-  ver_alpha <- TRUE
-  while(ver_alpha){
-    alpha <- nloptr(
-  x0 = rep(1/5, 5),
-  eval_f = function(alpha) -Ulog_penal(alpha, mu=mu_t, gamma=gamma_t, Sigma=Sigma_t, penal=rho),
-  opts = opts
-  )
-    print('Suma alpha')
-    print(sum(alpha))
-    if(sum(alpha)-1 < 1e-6){
-      ver_alpha <- FALSE
-      print('ENTRO')
-      print(alpha)
-      break
-    } else{
-      rho <- 10*rho
+      return(as.numeric(num/denom - penal))
     }
-  }
-  return(alpha)
-}
-
-a_log2 <- getAlpha_ts(mu_hat, se_hat, gamma_param, getSigmaMV, Alpha_logU, Xtrain, Xtest)
-
-check_log <- getChecks(a_log, mode=c("sum1"))
-ret_log <- getRet(a_log, Xtest, check_log)
-print(paste("Rendimiento Final Acumulado:", round(ret_log * 100, 2), "%"))
-```
-```{r}
-opts <- list(
-  algorithm = "NLOPT_GN_MLSL",#NLOPT_GN_MLSL",#"NLOPT_GN_MLSL_LDS",
-  maxeval = 2000,
-  local_opts = list(
-    algorithm = "NLOPT_LD_LBFGS", 
-    xtol_rel = 1e-8
-  )
-)
-
-k <- getSigmaMV(se_hat[1,], Xtrain)
-alpha_p <- nloptr(
-  x0 = getAlphaRandom(mu = mu_hat[1,], 
-                      gamma = 1,
-                      Sigma = k),
-  
-  eval_f = function(alpha) {
-    -Ulog_penal(alpha,
-                mu    = mu_hat[1,],
-                gamma = 1,
-                Sigma = k,
-                penal = 10)
-  },
-  
-  lb = rep(-200,5),
-  ub = rep(200,5),
-  opts = opts
-)
-```
-
-
-```{r}
-alpha_p <- nloptr(
-  x0 = getAlphaRandom(mu=mu_hat[1,], gamma=1, Sigma=getSigmaMV(se_hat[1,],Xtrain)),
-  eval_f = function(alpha){-Ulog_penal(alpha, 
-                                       mu=mu_hat[1,], 
-                                       gamma=1, 
-                                       Sigma=getSigmaMV(se_hat[1,],Xtrain), 
-                                       penal=10)},
-  opts = opts,
-  lb = rep(-200,5),
-  ub = rep(200,5)
-  )
-```
-
-```{r}
-x0 <- getAlphaRandom(mu=mu_hat[1,], gamma=1, Sigma=getSigmaMV(se_hat[1,],Xtrain))
-pl <-  function(alpha){-Ulog_penal(alpha, 
-                                       mu=mu_hat[1,], 
-                                       gamma=1, 
-                                       Sigma=getSigmaMV(se_hat[1,],Xtrain), 
-                                       penal=10)}
-pl(x0)
-```
-
-
-
-```{r}
-library(DEoptim)
-
-Ulog <- function(alpha, mu, gamma, Sigma){
-  num <- log(1+t(alpha)%*%mu) - gamma*t(alpha)%*%Sigma%*%alpha
-  denom <- (2*(1+t(alpha)%*%mu)^2)
-  ulog <- num/denom
-  
-  return(as.numeric(ulog))
-}
-
-# Añadiendo un parámetro de penalización para la restricción sum(alpha)=1
-Ulog_penal <- function(alpha, mu, gamma, Sigma, penal){
-  ulog <- Ulog(alpha,mu,gamma,Sigma)
-  penal <- penal*(sum(alpha)-1)^2
-  
-  return(as.numeric(ulog - penal))
-}
-
-# Prueba con una función sencilla
-ejemplo_optim <- function(x,y,z){
-  fun <- y*x^2 +z*x
-  return(fun)
-}
-
-# Optimizamos comprobando la penalización
-Alpha_logU <- function(mu_t, Sigma, gamma_t){
-  print(mu_t)
-  rho <- 1
-  ver_alpha <- TRUE
-  while(ver_alpha){
-    # Primero encontramos un buen punto inicial para iterar basándonos en el rango de la solución del apartado 3.1
-    alpha_0 <- getAlphaRandom(mu_t, Sigma, gamma_t)
-    #alpha_0 <- rep(1/5,5)
-    res <- optim(par=alpha_0, fn = function(alpha) -Ulog_penal(alpha, mu=mu_t, gamma=gamma_t, Sigma=Sigma_t, penal=rho),
-                method = "BFGS")
+    # Tomamos como punto inicial de la iteración el resultado para el caso lineal
+    alpha_0 <- getAlphaMV(mu, Sigma, gamma)
+    
+    # Encontramos el óptimo con el algoritmo BFGS
+    res <- optim(par=alpha_0, fn =function(alpha) -Ulog_penal(alpha), method = "BFGS")
+    summary(res)
     alpha <- res$par
-    print('Suma alpha')
-    print(sum(alpha))
+    # Comprobamos que suma 1 y si no aumentamos la penalización
     if(sum(alpha)-1 < 1e-6){
-      ver_alpha <- FALSE
-      print('ENTRO')
-      print(alpha)
-      break
+      # Si suma 1 se acaba aquí el bucle y devolveremos este alpha
+      comprobar_alpha <- FALSE
     } else{
-      rho <- 10*rho
+      penal <- 10*penal
     }
   }
+  
   return(alpha)
 }
-
-a_log <- getAlpha_ts(mu_hat, se_hat, gamma_param, getSigmaMV, Alpha_logU, Xtrain, Xtest)
-
-check_log <- getChecks(a_log, mode=c("sum1"))
-ret_log <- getRet(a_log, Xtest, check_log)
-print(paste("Rendimiento Final Acumulado:", round(ret_log * 100, 2), "%"))
 ```
 
 
 ```{r}
-# Obtengo alpha para la log-utilidad
-## voy a asumir que la sigma se obtiene de la misma forma así que lo único que cambia es la función para obtener alpha
-alpha_lu <- getAlpha_ts(
+# Definimos Gamma (aversión al riesgo)
+gammaLog <- 1 
+
+# APARTADO 4: Optimización de la log-utilidad con posiciones cortas
+print("--- RESULTADOS APARTADO 4 ---")
+
+alpha_4 <- getAlpha_ts(
   mus = mu_hat, 
   sigs = se_hat, 
-  gamma = gamma_param,
-  getSigmaFunc = getSigmaMV,   
-  getAlphaFunc = Alpha_logU,
+  gamma = gammaLog,
+  getSigmaFunc = getSigmaLog, 
+  getAlphaFunc = getAlphaLog, 
   Xtrain = Xtrain, 
   Xtest = Xtest
 )
-getAlphaRandomPos(mu_hat, se_hat, gamma_param)
+
+# Validamos (solo check de suma=1, permitimos negativos)
+check_4 <- getChecks(alpha_4, mode=c("sum1"))
+print(paste("¿Cumple restricciones?:", check_4))
+
+# Rendimiento
+ret_4 <- getRet(alpha_4, Xtest, check_4)
+print(paste("Rendimiento Final Acumulado:", round(ret_4 * 100, 2), "%"))
 ```
 
