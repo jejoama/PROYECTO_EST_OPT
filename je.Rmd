@@ -8,6 +8,10 @@ date: "2025-12-11"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
+
+
+
 teamName <- "GrupoJILFC"
 # integrante 1: Aguilar Marin, Jeremy Joel
 # integrante 2: Barba La Orden, Irene
@@ -22,6 +26,7 @@ teamName <- "GrupoJILFC"
 train <- read.csv("stock_returns_train_2.csv")
 
 # Serie temporal
+train_serie <- ts(train)
 train_serie<- ts(train/100)
 summary(train_serie)
 
@@ -68,15 +73,19 @@ for (i in 1:ncol(train_serie)){
 
 # Funcion para predecir UN activo para el periodo test en el momento t
 ```{r}
+
 getPred <- function(x_train, x_test_past){
-  x_test_past <- as.numeric(x_test_past)
-  x_past <- c(x_train, x_test_past)
-  fit <- auto.arima(x_past, seasonal = FALSE)
-  fc <- forecast::forecast(fit, h = 1)
-  mu_hat <- as.numeric(fc$mean)
-  se_hat <- as.numeric(fc$se)
-  var_hat <- se_hat^2
-  return(list(mu_hat = mu_hat, se_hat = se_hat))
+  mod <- auto.arima(x_train, stepwise = FALSE, approximation = FALSE)
+  x_past = c(x_train, x_test_past)
+  fit_upd <- Arima(x_past, model = mod)
+  fc <- forecast::forecast(fit_upd, h = 1)
+  mu_hat  <- as.numeric(fc$mean[1])
+  z80 <- qnorm(0.8)
+  se_from_up <- (fc$upper[,"80%"][1] - fc$mean[1]) / z80
+  se_from_lo <- (fc$mean[1]  - fc$lower[,"80%"][1]) / z80
+  se_hat_aux <- pmax(se_from_up, se_from_lo) 
+  se_hat  <- as.numeric(se_hat_aux)
+  return(list(mu_hat=mu_hat, se_hat=se_hat))
 }
 ```
 
@@ -89,11 +98,12 @@ getPred_ts<- function(Xtrain, Xtest, getPredFunc){
   mu_hat <- matrix(NA, H, 5)
   se_hat <- matrix(NA, H, 5)
 
-  X_test_past <- matrix(nrow = 0, ncol = ncol(Xtest))
+  X_test_past <- Xtest[0,]
   print(paste("dim X test past: ", dim(X_test_past)))
   for (h in seq_len(H)) {
     for (i in 1:5){
-      pred = getPredFunc(Xtrain[, i], as.numeric(X_test_past[, i]))
+      # update model state with data up to t-1 (parameters fixed)
+      pred = do.call(getPredFunc, list(Xtrain[,i], X_test_past[,i]))
       mu_hat[h,i] <- pred$mu_hat
       se_hat[h,i] <- pred$se_hat
     }
@@ -106,16 +116,14 @@ getPred_ts<- function(Xtrain, Xtest, getPredFunc){
 res <- getPred_ts(Xtrain, Xtest, getPred)
 mu_hat <- res$mu_hat
 se_hat <- res$se_hat
-res
-mu_hat
-se_hat
 
 ```
 
+
 ```{r}
 rmse <- sqrt(mean((Xtest - mu_hat)^2))
-print(paste("RMSE promedio:", round(rmse,6)))
-
+evals <- c(rmse=rmse)
+evals
 
 ```
 
