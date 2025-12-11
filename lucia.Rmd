@@ -314,13 +314,15 @@ getAlphaLog <- function(mu,Sigma, gamma){
       num <- log(1+t(alpha)%*%mu) - gamma*t(alpha)%*%Sigma%*%alpha
       denom <- (2*(1+t(alpha)%*%mu)^2)
       penal <- penal*(sum(alpha)-1)^2
-  
+      
       return(as.numeric(num/denom - penal))
     }
     # Tomamos como punto inicial de la iteración el resultado para el caso lineal
     alpha_0 <- getAlphaMV(mu, Sigma, gamma)
     
     # Encontramos el óptimo con el algoritmo BFGS
+    # Podemos obtener a veces warnings si el logaritmo tiene argumento negativo y genera NaN
+    # Pero no es alarmante ya que optim simplemente considera este punto inviable y sigue iterando
     res <- optim(par=alpha_0, fn =function(alpha) -Ulog_penal(alpha), method = "BFGS")
     summary(res)
     alpha <- res$par
