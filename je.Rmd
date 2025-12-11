@@ -68,7 +68,7 @@ for (i in 1:ncol(train_serie)){
 ```
 
 ##########################
-# seccion 2 - predicciones
+# seccion 2 - prediccione
 ##########################
 
 # Funcion para predecir UN activo para el periodo test en el momento t
