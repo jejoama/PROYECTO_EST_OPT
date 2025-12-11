@@ -365,7 +365,7 @@ getAlphaRandom <- function(mu, Sigma, gamma){
   # Cálculo de Lambda y Alpha óptimo
   lambda <- (t(vec) %*% invSigma %*% mu - gamma) / (t(vec) %*% invSigma %*% vec)
   alpha <- (1/gamma) * invSigma %*% (mu - as.numeric(lambda) * vec)
-  
+  print(as.numeric(alpha))
   return(as.numeric(alpha))
 }
 
@@ -448,7 +448,19 @@ print(paste("Rendimiento Final Acumulado:", round(ret_3_2 * 100, 2), "%"))
 ```
 
 ## Log-utilidad
+
 ```{r}
+library(nloptr)
+
+opts <- list(
+  algorithm = "NLOPT_GN_MLSL_LDS",
+  maxeval = 2000,
+  local_opts = list(
+    algorithm = "NLOPT_LD_LBFGS", 
+    xtol_rel = 1e-8
+  )
+)
+
 Ulog <- function(alpha, mu, gamma, Sigma){
   num <- log(1+t(alpha)%*%mu) - gamma*t(alpha)%*%Sigma%*%alpha
   denom <- (2*(1+t(alpha)%*%mu)^2)
@@ -476,9 +488,123 @@ Alpha_logU <- function(mu_t, Sigma, gamma_t){
   print(mu_t)
   rho <- 1
   ver_alpha <- TRUE
-  alpha_0 <- rep(1,5)/5
-  alpha <- alpha_0
   while(ver_alpha){
+    alpha <- nloptr(
+  x0 = rep(1/5, 5),
+  eval_f = function(alpha) -Ulog_penal(alpha, mu=mu_t, gamma=gamma_t, Sigma=Sigma_t, penal=rho),
+  opts = opts
+  )
+    print('Suma alpha')
+    print(sum(alpha))
+    if(sum(alpha)-1 < 1e-6){
+      ver_alpha <- FALSE
+      print('ENTRO')
+      print(alpha)
+      break
+    } else{
+      rho <- 10*rho
+    }
+  }
+  return(alpha)
+}
+
+a_log2 <- getAlpha_ts(mu_hat, se_hat, gamma_param, getSigmaMV, Alpha_logU, Xtrain, Xtest)
+
+check_log <- getChecks(a_log, mode=c("sum1"))
+ret_log <- getRet(a_log, Xtest, check_log)
+print(paste("Rendimiento Final Acumulado:", round(ret_log * 100, 2), "%"))
+```
+```{r}
+opts <- list(
+  algorithm = "NLOPT_GN_MLSL",#NLOPT_GN_MLSL",#"NLOPT_GN_MLSL_LDS",
+  maxeval = 2000,
+  local_opts = list(
+    algorithm = "NLOPT_LD_LBFGS", 
+    xtol_rel = 1e-8
+  )
+)
+
+k <- getSigmaMV(se_hat[1,], Xtrain)
+alpha_p <- nloptr(
+  x0 = getAlphaRandom(mu = mu_hat[1,], 
+                      gamma = 1,
+                      Sigma = k),
+  
+  eval_f = function(alpha) {
+    -Ulog_penal(alpha,
+                mu    = mu_hat[1,],
+                gamma = 1,
+                Sigma = k,
+                penal = 10)
+  },
+  
+  lb = rep(-200,5),
+  ub = rep(200,5),
+  opts = opts
+)
+```
+
+
+```{r}
+alpha_p <- nloptr(
+  x0 = getAlphaRandom(mu=mu_hat[1,], gamma=1, Sigma=getSigmaMV(se_hat[1,],Xtrain)),
+  eval_f = function(alpha){-Ulog_penal(alpha, 
+                                       mu=mu_hat[1,], 
+                                       gamma=1, 
+                                       Sigma=getSigmaMV(se_hat[1,],Xtrain), 
+                                       penal=10)},
+  opts = opts,
+  lb = rep(-200,5),
+  ub = rep(200,5)
+  )
+```
+
+```{r}
+x0 <- getAlphaRandom(mu=mu_hat[1,], gamma=1, Sigma=getSigmaMV(se_hat[1,],Xtrain))
+pl <-  function(alpha){-Ulog_penal(alpha, 
+                                       mu=mu_hat[1,], 
+                                       gamma=1, 
+                                       Sigma=getSigmaMV(se_hat[1,],Xtrain), 
+                                       penal=10)}
+pl(x0)
+```
+
+
+
+```{r}
+library(DEoptim)
+
+Ulog <- function(alpha, mu, gamma, Sigma){
+  num <- log(1+t(alpha)%*%mu) - gamma*t(alpha)%*%Sigma%*%alpha
+  denom <- (2*(1+t(alpha)%*%mu)^2)
+  ulog <- num/denom
+  
+  return(as.numeric(ulog))
+}
+
+# Añadiendo un parámetro de penalización para la restricción sum(alpha)=1
+Ulog_penal <- function(alpha, mu, gamma, Sigma, penal){
+  ulog <- Ulog(alpha,mu,gamma,Sigma)
+  penal <- penal*(sum(alpha)-1)^2
+  
+  return(as.numeric(ulog - penal))
+}
+
+# Prueba con una función sencilla
+ejemplo_optim <- function(x,y,z){
+  fun <- y*x^2 +z*x
+  return(fun)
+}
+
+# Optimizamos comprobando la penalización
+Alpha_logU <- function(mu_t, Sigma, gamma_t){
+  print(mu_t)
+  rho <- 1
+  ver_alpha <- TRUE
+  while(ver_alpha){
+    # Primero encontramos un buen punto inicial para iterar basándonos en el rango de la solución del apartado 3.1
+    alpha_0 <- getAlphaRandom(mu_t, Sigma, gamma_t)
+    #alpha_0 <- rep(1/5,5)
     res <- optim(par=alpha_0, fn = function(alpha) -Ulog_penal(alpha, mu=mu_t, gamma=gamma_t, Sigma=Sigma_t, penal=rho),
                 method = "BFGS")
     alpha <- res$par
