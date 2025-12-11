@@ -286,6 +286,18 @@ print(paste("¿Cumple restricciones (Suma=1 y Positivos)?:", check_3_2))
 
 ret_3_2 <- getRet(alpha_3_2, Xtest, check_3_2)
 print(paste("Rendimiento Final Acumulado:", round(ret_3_2 * 100, 2), "%"))
+# Utilidad relativa MV
+Umv_rel <- getUEval(
+  alpha_3_1, mu_hat, se_hat,
+  Xtrain, Xtest,
+  gammaMV, getSigmaMV,
+  check_3_1, Umv
+)
+
+# Añadir a evals
+evals <- c(evals, retMV = ret_3_1)
+evals <- c(evals, Umv = Umv_rel)
+
 ```
 
 
@@ -360,7 +372,7 @@ Ulog_rel <- getUEval(
   check_log, Ulog
 )
 
-# ✅ Añadir al vector evals como hace el profesor
+# 
 evals <- c(evals, retLog = ret_log)
 evals <- c(evals, Ulog = Ulog_rel)
 
