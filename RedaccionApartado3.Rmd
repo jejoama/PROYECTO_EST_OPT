@@ -1,16 +1,59 @@
 ---
-title: "Proyecto Estadística y Optimización."
-output:
+title: "Proyecto Estadística y Optimización"
+date: "2025-12-15"
+output: 
   pdf_document: default
   html_document: default
-date: "2025-12-15"
+header-includes:
+  - \usepackage{titling}
+  - \pretitle{\begin{center}\LARGE}
+  - \posttitle{\end{center}}
+  - \preauthor{\begin{center}\small}
+  - \postauthor{\end{center}}
+author: |
+  Jeremy Joel Aguilar Marin, Irene Barba La Orden, Lucía Benages Guijarro, Fabián Calvo Castillo, Cristhian Torrico Castellon
 ---
+
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-A continuación se describen las funciones utilizadas para obtener los pesos óptimos, $\alpha_t$, para cada activo en $t=T+1, ..., T+r$ y el rendimiento acumulado total. Te ndremos en cuenta dos casos: (3.1) permitiendo posiciones cortas y (3.2) restringiéndolas ($\alpha_t \geq 0$). Para ello se debe optimizar la función utilidad media-varianza, $U_{MV}$, para obtener estos pesos y así obtener el mejor rendimiento mitigando el riesgo. 
+Para poder hacer un pronóstico de los rendimientos futuros de los 5 activos del CSV stock_returns_trains_2.csv hemos empleado modelos ARIMA univariados, ajustados mediante la función `auto.arima` (correspondiente a la librería: `forecast`). Esto lo que nos quiere decir es que si el rendimiento de hoy depende un poco del rendimiento de ayer, el modelo ARIMA lo detecta, ya que nuestro modelo ARIMA lo que hace es detectar los patrones en el tiempo, todo y que estos patrones sean o no insignificantes. Además, hay que tener en cuenta que ARIMA NO sobreajusta, no se inventa patrones inexistentes. Lo explicado con anterioridad es adecuado para series financieras con autocorrelación débil.
+
+A partir de esto, pudimos obtener dos variables fundamentales:
+
+- El rendimiento esperado del activo (\(\mu_t\)), es decir, lo que el modelo anticipa que podría ocurrir
+- La desviación estándar (\(\sigma_t\)), que refleja el nivel de riesgo asociado a esa predicción.
+
+Para poder comprobar todo estuviera bien ajustado, hemos procedido a comprobar los residuos con dos pruebas estadísticas habituales en series temporales:  
+
+- Ljung–Box (mediante Box.test) --> que detecta si queda autocorrelación no explicada  
+- ARCH (mediante ArchTest de la libreria *FinTS*) --> revisa si existe heterocedasticidad
+
+Con esto podemos verificar que nuestro trabajo es razonable, y gracias a esto podemos verificar los apartados 2,3 y 4.
+
+En el apartado 2, usamos la función `getPred()`, la cual nos ajusta un modelo ARIMA con los datos del activo para posteriormente actualizar los datos con la información más reciente hasta el día \(t-1\) (con el fin de tener los datos mas actuales posibles). A partir de este modelo (ya actualizado) se obtiene:
+
+- una predicción del rendimeinto del activo del siguiente día mañana (\(\hat{\mu}_t\))
+- una estimación de la incertidumbre del modelo (\(\hat{\sigma}_t\)) --> para saber que tan segura es nuestra predicción
+
+A continuación, tenemos la función `getPred_ts()`. Esta lo que hace es repetir el proceso de predicción día a día y activo por activo. Su procesos es sencillo:
+
+1. Empieza en el primer día del periodo test
+2. Calcula la predicción de los activos
+3. Guarda los datos
+4. Hace lo mismo con el siguiente día, e incorpora toda la información.
+
+Despues "construye" dos matrices:
+
+- `mu_hat` --> Predicción del rendimiento del activo para el día t
+- `se_hat` --> Desviación estándar estimada para el día t
+
+Finalmente, se calcula el RMSE para evaluar la calidad de las predicciones. En nuestro caso, el RMSE obtenido fue de 0.0175, lo que indica que, en promedio, el modelo comete un error del 1.75% en la predicción de los rendimientos diarios. Este nivel de error es razonable para datos financieros, que suelen presentar alta volatilidad. 
+
+A continuación se describen las funciones utilizadas para obtener los pesos óptimos, $\alpha_t$, para cada activo en $t=T+1, ..., T+r$ y el rendimiento acumulado total. Tendremos en cuenta dos casos: (3.1) permitiendo posiciones cortas y (3.2) restringiéndolas ($\alpha_t \geq 0$). Para ello se debe optimizar la función utilidad media-varianza, $U_{MV}$, para obtener estos pesos y así obtener el mejor rendimiento mitigando el riesgo. 
 
 Si nos fijamos en la función utilidad media-varianza,
 $$U_{MV}=\alpha_t^T\mu_t-\frac{\gamma}{2}\alpha_t^T\Sigma_t\alpha_t,$$
@@ -32,6 +75,11 @@ En este caso hemos obtenido un rendimiento de 0.62. A diferencia del caso anteri
 
 
 
+# Distribución del proyecto
+
+- Apartado 2: Jeremy Joel Aguilar Marin
+- Apartado 3: Irene Barba La Orden y Fabián Castillo Calvo
+- Apartado 4: Lucía Benages Guijarro
 
 
 
