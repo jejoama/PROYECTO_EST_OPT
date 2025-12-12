@@ -1,0 +1,546 @@
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source("eval_funcss.R")
+```
+
+
+teamName <- "GrupoJILFC"
+# integrante 1: Aguilar Marin, Jeremy Joel
+# integrante 2: Barba La Orden, Irene
+# integrante 3: Benages Guijarro, Lucía
+# integrante 4: Calvo Castillo, Fabián
+# integrante 5: Torrico Castellon, Cristhian
+
+
+# Extracción del Dataset
+
+```{r}
+train <- read.csv("stock_returns_train_2.csv")
+
+# Serie temporal
+
+train_serie<- ts(train/100)
+#4.599
+
+```
+
+# División Train vs Test
+
+```{r}
+filas_train <- nrow(train)
+
+#Hemos pensando en dividirlo en 80% train vs 20% Test
+
+#Entrenamiento --> 96 primeros
+Xtrain <- window(train_serie, start=1, end=floor(0.8*filas_train))
+
+# Validación: 24 ultimos
+Xtest <- window(train_serie, start=floor(0.8*filas_train)+1, end=filas_train)
+
+```
+
+PASO 2
+Nos pide tanto la varianza como el valor esperado de neustra estimación. Haciendolo de modo que en nuestro tiempo t, cojamos todo lo del pasado --> t-1... --> para ello Modelo ARIMA
+```{r}
+library(forecast)  
+library(FinTS)    
+
+for (i in 1:ncol(train_serie)){
+  x_train <- Xtrain[,i]  
+  fit_arima <- auto.arima(x_train, seasonal = FALSE)
+
+  Box_test <- Box.test(residuals(fit_arima), lag=20, type="Ljung-Box")
+  
+  arch_test <- ArchTest(residuals(fit_arima), lags=20)
+  print(Box_test)
+  print(arch_test)
+  print("--------------")
+}
+
+```
+
+##########################
+# seccion 2 - predicciones
+##########################
+
+# Funcion para predecir UN activo para el periodo test en el momento t
+```{r}
+getPred <- function(x_train, x_test_past){
+  mod <- auto.arima(x_train, stepwise = FALSE, approximation = FALSE)
+  x_past = c(x_train, x_test_past)
+  fit_upd <- Arima(x_past, model = mod)
+  fc <- forecast::forecast(fit_upd, h = 1)
+  mu_hat  <- as.numeric(fc$mean[1])
+  z80 <- qnorm(0.8)
+  se_from_up <- (fc$upper[,"80%"][1] - fc$mean[1]) / z80
+  se_from_lo <- (fc$mean[1]  - fc$lower[,"80%"][1]) / z80
+  se_hat_aux <- pmax(se_from_up, se_from_lo) 
+  se_hat  <- as.numeric(se_hat_aux)
+  return(list(mu_hat=mu_hat, se_hat=se_hat))
+}
+```
+
+
+2,2
+
+```{r}
+getPred_ts<- function(Xtrain, Xtest, getPredFunc){
+  
+  H <- nrow(Xtest)
+  mu_hat <- matrix(NA, H, 5)
+  se_hat <- matrix(NA, H, 5)
+
+  X_test_past <- Xtest[0,]
+  print(paste("dim X test past: ", dim(X_test_past)))
+  for (h in seq_len(H)) {
+    for (i in 1:5){
+      # update model state with data up to t-1 (parameters fixed)
+      pred = do.call(getPredFunc, list(Xtrain[,i], X_test_past[,i]))
+      mu_hat[h,i] <- pred$mu_hat
+      se_hat[h,i] <- pred$se_hat
+    }
+    X_test_past <- Xtest[1:h,,drop=FALSE]
+  }
+  return(list(mu_hat=mu_hat, se_hat=se_hat))
+}
+
+# Ejecutar predicciones
+set.seed(43)
+res <- getPred_ts(Xtrain, Xtest, getPred)
+mu_hat = res$mu_hat
+se_hat = res$se_hat
+
+```
+
+
+```{r}
+rmse <- sqrt(mean((Xtest - mu_hat)^2))
+evals <- c(rmse=rmse)
+evals
+```
+
+
+
+
+#####################################
+# seccion 3 - utilidad media-varianza
+###########################################################
+# 3.1 utilidad media-varianza, alfa_i positiva o negativa
+###########################################################
+
+
+```{r}
+# FUNCIONES DADAS POR EMILIANO
+
+# obtener alpha_t en funcion de mu_t, sig_t, gamma y la funcion Sigma(sig_t, Xpast) elegida
+getAlpha <- function(mu,sig, gamma, getSigmaFunc, getAlphaFunc, Xpast){
+  Sigma <- do.call(getSigmaFunc, list(sig, Xpast))
+  alpha <- do.call(getAlphaFunc, list(mu, Sigma, gamma))
+  return(alpha)  
+}
+
+# obtener alpha para todo periodo de test
+getAlpha_ts <- function(mus, sigs, gamma, getSigmaFunc, getAlphaFunc, Xtrain, Xtest){
+  H <- nrow(Xtest)
+  alpha_hat <- matrix(NA, H, 5)
+  Xpast <- as.matrix(Xtrain)
+  for (h in seq_len(H)) {
+    alpha_hat[h,] <- getAlpha(mus[h,], sigs[h,], gamma, getSigmaFunc, getAlphaFunc, Xpast)
+    dato_hoy<-as.matrix(Xtest[h,])
+    Xpast <- rbind(Xpast, Xtest[h,])
+  }  
+  return(alpha_hat)
+}
+
+# funcion para checar si las alfas cumplen los requisitos segun el inciso
+getChecks <- function(alpha_hat, mode=c("sum1","pos")){
+  passChecks <- TRUE
+  if(("sum1" %in% mode) & passChecks){
+    #print("sum1 check")
+    passChecks <- all( (apply(alpha_hat, 1, sum)-1) <1e-6)
+  }
+  if(("pos" %in% mode) & passChecks){
+    #print("pos check")
+    passChecks <- all(alpha_hat>=0)
+  }
+  return(passChecks)
+}
+
+# obtener el rendimeinto del portafolio
+getRet <- function(alpha_hat, Xtest, passChecks){
+  if(!passChecks) return(NA)
+  Xtest_mat <- as.matrix(Xtest)
+  ret <-prod(1+apply(alpha_hat*(Xtest_mat), 1, sum))-1
+  return(ret)
+}
+```
+
+```{r}
+# Para el modelo MV: Sigma = D * R * D
+getSigmaMV <- function(sig, Xpast){
+  R <- cor(Xpast, use="pairwise.complete.obs") 
+  D <- diag(sig)  
+  Sigma <- D %*% R %*% D
+  return(Sigma)
+}
+
+# APARTADO 3.1: Con Posiciones Cortas
+getAlphaMV <- function(mu, Sigma, gamma){
+  vec <- rep(1, length(mu))
+  invSigma <- solve(Sigma)
+  
+  # Cálculo de Lambda y Alpha óptimo
+  lambda <- (t(vec) %*% invSigma %*% mu - gamma) / (t(vec) %*% invSigma %*% vec)
+  alpha <- (1/gamma) * invSigma %*% (mu - as.numeric(lambda) * vec)
+  
+  return(as.numeric(alpha))
+}
+
+# Para el modelo MV Positivo (usualmente es la misma lógica de riesgo)
+getSigmaMVPos <- function(sig, Xpast){
+  return(getSigmaMV(sig, Xpast))
+}
+
+
+# APARTADO 3.2: Sin Posiciones Cortas (Quadprog)
+library(quadprog)
+
+getAlphaMVPos <- function(mu, Sigma, gamma){
+  n <- length(mu)
+  
+  # Configuración para solve.QP
+  Dmat <- gamma * Sigma + diag(1e-8, n) # Ajuste numérico
+  dvec <- mu
+  Amat <- cbind(rep(1, n), diag(n))     # Restricciones: Suma=1, I>=0
+  bvec <- c(1, rep(0, n))               # Valores: 1, 0, 0, 0...
+  
+  # Resolución numérica
+  res <- tryCatch({
+    sol<- solve.QP(Dmat, dvec, Amat, bvec, meq=1)
+    sol$solution
+  }, error = function(e) {
+    return(rep(1/n, n)) # Si falla, pesos iguales
+  })
+  res[res < 0] <- 0 
+  res <- res / sum(res)
+  
+  return(res)
+}
+```
+
+```{r}
+# Definimos Gamma (aversión al riesgo)
+gammaMV <- 20
+
+# APARTADO 3.1: Optimización CON posiciones cortas
+print("--- RESULTADOS APARTADO 3.1 (CON CORTOS) ---")
+
+# Ejecutamos el código de Emiliano usando las piezas MV (Lagrange)
+alpha_3_1 <- getAlpha_ts(
+  mus = mu_hat, 
+  sigs = se_hat, 
+  gamma = gammaMV,
+  getSigmaFunc = getSigmaMV, 
+  getAlphaFunc = getAlphaMV, 
+  Xtrain = Xtrain, 
+  Xtest = Xtest
+)
+
+# Validamos (solo check de suma=1, permitimos negativos)
+check_3_1 <- getChecks(alpha_3_1, mode=c("sum1"))
+print(paste("¿Cumple restricciones?:", check_3_1))
+
+# Rendimiento
+ret_3_1 <- getRet(alpha_3_1, Xtest, check_3_1)
+print(paste("Rendimiento Final Acumulado:", round(ret_3_1 * 100, 2), "%"))
+```
+
+```{r}
+gammaMVPos <- 20
+
+# APARTADO 3.2: Optimización SIN posiciones cortas (Solo largos)
+print(" ")
+print("--- RESULTADOS APARTADO 3.2 (SIN CORTOS) ---")
+
+
+alpha_3_2 <- getAlpha_ts(
+  mus = mu_hat, 
+  sigs = se_hat, 
+  gamma = gammaMVPos,
+  getSigmaFunc = getSigmaMVPos,   
+  getAlphaFunc = getAlphaMVPos,
+  Xtrain = Xtrain, 
+  Xtest = Xtest
+)
+
+check_3_2 <- getChecks(alpha_3_2, mode=c("sum1", "pos"))
+print(paste("¿Cumple restricciones (Suma=1 y Positivos)?:", check_3_2))
+
+ret_3_2 <- getRet(alpha_3_2, Xtest, check_3_2)
+print(paste("Rendimiento Final Acumulado:", round(ret_3_2 * 100, 2), "%"))
+```
+
+
+
+```{r}
+############################################
+# AÑADIR A evals — APARTADO 3
+############################################
+
+# Utilidad relativa MV (con cortos)
+Umv_rel_3_1 <- getUEval(
+  alpha_3_1, mu_hat, se_hat,
+  Xtrain, Xtest,
+  gammaMV, getSigmaMV,
+  check_3_1, Umv
+)
+
+evals <- c(evals, retMV = ret_3_1)
+evals <- c(evals, Umv = Umv_rel_3_1)
+
+# Utilidad relativa MVPos (sin cortos)
+Umv_rel_3_2 <- getUEval(
+  alpha_3_2, mu_hat, se_hat,
+  Xtrain, Xtest,
+  gammaMVPos, getSigmaMVPos,
+  check_3_2, Umv
+)
+
+evals <- c(evals, retMVPos = ret_3_2)
+evals <- c(evals, UmvPos = Umv_rel_3_2)
+
+```
+
+
+
+```{r}
+############################################
+# SECCIÓN 4 — UTILIDAD LOGARÍTMICA (CON CORTOS)
+############################################
+
+gammaLog = 1 # INSERTAR VALOR EN REALES
+
+# Funcion para estimar la matriz de covarianzas entre los rendimientos de los 5
+# activos a partir de las desviaciones estándares (que vendran de su modelo Arima)
+# y el historico de rendimientos (que pueden usar para estimar correlaciones) 
+getSigmaLog <- function(sig, Xpast){
+  Sigma <- getSigmaMV(sig, Xpast)
+  return(Sigma)
+}
+
+# Funcion para optimizar la asignacion de cada activo dentro del portafolio
+# tomando en cuenta la utilidad log CON posiciones cortas
+getAlphaLog <- function(mu,Sigma, gamma){
+  # INPUT: mu: vector en R^5 con los rendimientos esperados de los 5 activos para el periodo t
+  #        Sigma: matriz en R^{5 x 5} con las covarianzas de los 5 activos
+  #        gamma: valor en R que representa el apetito de riesgo. Entre mas bajo mas riesgo.
+  # OUTPUT: alpha: vector en R^5 con la asignación elegida para los 5 activos resultante de optimizar
+  # U-log sujeto a que alpha sume a 1.
+  
+  #INSERTAR PASOS DE OPTIMIZACION
+  # Repetiremos la optimización hasta verificar que el alpha suma 1
+  comprobar_alpha <- TRUE
+  # Penalización para la restricción
+  penal <- 10
+  while(comprobar_alpha){
+    # Definición de la función a maximizar, con un parámetro de penalización
+    Ulog_penal <- function(alpha){
+      ulog <- Ulog(alpha, gamma, mu, Sigma)
+      penal <- penal*(sum(alpha)-1)^2
+      
+      return(as.numeric(ulog - penal))
+    }
+    # Tomamos como punto inicial de la iteración el resultado para el caso lineal
+    alpha_0 <- getAlphaMV(mu, Sigma, gamma)
+    
+    # Encontramos el óptimo con el algoritmo BFGS
+    # Podemos obtener a veces warnings si el logaritmo tiene argumento negativo y genera NaN
+    # Pero no es alarmante ya que optim simplemente considera este punto inviable y sigue iterando
+    res <- optim(par=alpha_0, fn =function(alpha) -Ulog_penal(alpha), method = "BFGS")
+    summary(res)
+    alpha <- res$par
+    # Comprobamos que suma 1 y si no aumentamos la penalización
+    if(sum(alpha)-1 < 1e-6){
+      # Si suma 1 se acaba aquí el bucle y devolveremos este alpha
+      comprobar_alpha <- FALSE
+    } else{
+      penal <- 10*penal
+    }
+  }
+  
+  return(alpha)
+}
+
+
+print("--- RESULTADOS APARTADO 4 (UTILIDAD LOG) ---")
+
+# gamma
+gammaLog <- 20
+
+# obtener alphas usando la MISMA Sigma que MV (D R D)
+alpha_log <- getAlpha_ts(
+  mus = mu_hat,
+  sigs = se_hat,
+  gamma = gammaLog,
+  getSigmaFunc = getSigmaMV,     
+  getAlphaFunc = getAlphaLog,    
+  Xtrain = Xtrain,
+  Xtest = Xtest
+)
+
+# comprobación de restricciones (solo suma=1)
+check_log <- getChecks(alpha_log, mode = c("sum1"))
+print(paste("¿Cumple restricciones (suma=1)?:", check_log))
+
+# rendimiento acumulado
+ret_log <- getRet(alpha_log, Xtest, check_log)
+print(paste("Rendimiento Final Acumulado:", round(ret_log * 100, 2), "%"))
+
+# utilidad relativa log
+Ulog_rel <- getUEval(
+  alpha_log, mu_hat, se_hat,
+  Xtrain, Xtest,
+  gammaLog, getSigmaMV,   # <--- EL PROFESOR QUIERE ESTA
+  check_log, Ulog
+)
+
+# añadir a evals
+evals <- c(evals, retLog = ret_log)
+evals <- c(evals, Ulog = Ulog_rel)
+
+print("---- MÉTRICAS ACUMULADAS ----")
+print(evals)
+
+```
+
+
+
+
+##############################
+##############################
+##############################
+##############################
+##############################
+##############################
+
+#     GRAFICAS
+
+#Gráfica 1: Real vs Predicho (activo 1)
+```{r}
+library(ggplot2)
+
+for(i in 1:5){
+  df <- data.frame(
+    t = 1:nrow(Xtest),
+    Real = Xtest[,i],
+    Pred = mu_hat[,i]
+  )
+  
+  print(
+    ggplot(df, aes(t)) +
+      geom_line(aes(y=Real), color="black", size=1) +
+      geom_line(aes(y=Pred), color="blue", size=1) +
+      labs(title=paste("Real vs Predicho - Activo", i),
+           x="Tiempo Test", y="Retorno") +
+      theme_minimal()
+  )
+}
+
+```
+
+
+#Gráfica 2: Volatilidad pronosticada σ̂_t (activo 1)
+```{r}
+plot(se_hat[,1], type="l", col="red", lwd=2,
+     main="Volatilidad Pronosticada - Activo 1",
+     ylab="σ̂_t", xlab="Tiempo Test")
+
+
+```
+
+#Gráfica 3: Heatmap / Matriz de pesos α_t
+```{r}
+
+library(ggplot2)
+library(reshape2)
+
+df_alpha <- data.frame(alpha_3_1)
+df_alpha$time <- 1:nrow(df_alpha)
+df_melt <- melt(df_alpha, id="time")
+
+ggplot(df_melt, aes(time, variable, fill=value)) +
+  geom_tile() +
+  scale_fill_gradient2(low="red", high="blue", mid="white") +
+  labs(title="Evolución de pesos α_t (MV con cortos)",
+       x="Tiempo", y="Activo")
+
+
+```
+
+
+#Gráfica 4: Peso promedio por activo
+```{r}
+barplot(colMeans(alpha_3_1),
+        main="Pesos Promedios - MV con Cortos",
+        ylab="Peso Promedio",
+        names.arg=paste("A",1:5))
+
+
+
+```
+
+
+
+#Gráfica 5: Heatmap pesos sin cortos
+```{r}
+df_alpha <- data.frame(alpha_3_2)
+df_alpha$time <- 1:nrow(df_alpha)
+df_melt <- melt(df_alpha, id="time")
+
+ggplot(df_melt, aes(time, variable, fill=value)) +
+  geom_tile() +
+  scale_fill_gradient(low="white", high="blue") +
+  labs(title="Pesos α_t - MV Sin Cortos", x="Tiempo", y="Activo")
+
+
+```
+
+
+#Gráfica 6: Pesos del portafolio con utilidad log
+
+```{r}
+df_alpha <- data.frame(alpha_log)
+df_alpha$time <- 1:nrow(df_alpha)
+df_melt <- melt(df_alpha, id="time")
+
+ggplot(df_melt, aes(time, variable, fill=value)) +
+  geom_tile() +
+  labs(title="Pesos α_t - Utilidad Log",
+       x="Tiempo", y="Activo")
+
+
+```
+
+
+#Gráfica 7: Retorno acumulado (curva equity)
+
+```{r}
+ret_series <- 1 + rowSums(alpha_log * Xtest)
+equity <- cumprod(ret_series)
+
+plot(equity, type="l", lwd=2, col="darkgreen",
+     main="Evolución del Portafolio (Utilidad Log)",
+     ylab="Valor Acumulado", xlab="Tiempo Test")
+
+
+```
+
+
+```{r}
+print(evals)
+```
