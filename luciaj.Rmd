@@ -361,11 +361,10 @@ getAlphaLog <- function(mu,Sigma, gamma){
   while(comprobar_alpha){
     # Definición de la función a maximizar, con un parámetro de penalización
     Ulog_penal <- function(alpha){
-      num <- log(1+t(alpha)%*%mu) - gamma*t(alpha)%*%Sigma%*%alpha
-      denom <- (2*(1+t(alpha)%*%mu)^2)
+      ulog <- Ulog(alpha, gamma, mu, Sigma)
       penal <- penal*(sum(alpha)-1)^2
       
-      return(as.numeric(num/denom - penal))
+      return(as.numeric(ulog - penal))
     }
     # Tomamos como punto inicial de la iteración el resultado para el caso lineal
     alpha_0 <- getAlphaMV(mu, Sigma, gamma)
