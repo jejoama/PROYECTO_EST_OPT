@@ -287,10 +287,6 @@ print(paste("Rendimiento Final Acumulado:", round(ret_3_2 * 100, 2), "%"))
 
 
 ```{r}
-############################################
-# AÑADIR A evals — APARTADO 3
-############################################
-
 # Utilidad relativa MV (con cortos)
 Umv_rel_3_1 <- getUEval(
   alpha_3_1, mu_hat, se_hat,
@@ -350,7 +346,7 @@ print(paste("Rendimiento Final Acumulado:", round(ret_log * 100, 2), "%"))
 Ulog_rel <- getUEval(
   alpha_log, mu_hat, se_hat,
   Xtrain, Xtest,
-  gammaLog, getSigmaMV,   # <--- EL PROFESOR QUIERE ESTA
+  gammaLog, getSigmaMV, 
   check_log, Ulog
 )
 
