@@ -24,7 +24,7 @@ train <- read.csv("stock_returns_train_2.csv")
 # Serie temporal
 
 train_serie<- ts(train/100)
-
+#4.599
 
 ```
 
@@ -284,12 +284,57 @@ ret_3_2 <- getRet(alpha_3_2, Xtest, check_3_2)
 print(paste("Rendimiento Final Acumulado:", round(ret_3_2 * 100, 2), "%"))
 ```
 
+```{r}
+############################################
+# SECCIÓN 4 — UTILIDAD LOGARÍTMICA (CON CORTOS)
+############################################
+
+print("--- RESULTADOS APARTADO 4 (UTILIDAD LOG) ---")
+
+# gamma
+gammaLog <- 20
+
+# obtener alphas usando la MISMA Sigma que MV (D R D)
+alpha_log <- getAlpha_ts(
+  mus = mu_hat,
+  sigs = se_hat,
+  gamma = gammaLog,
+  getSigmaFunc = getSigmaMV,     
+  getAlphaFunc = getAlphaLog,    
+  Xtrain = Xtrain,
+  Xtest = Xtest
+)
+
+# comprobación de restricciones (solo suma=1)
+check_log <- getChecks(alpha_log, mode = c("sum1"))
+print(paste("¿Cumple restricciones (suma=1)?:", check_log))
+
+# rendimiento acumulado
+ret_log <- getRet(alpha_log, Xtest, check_log)
+print(paste("Rendimiento Final Acumulado:", round(ret_log * 100, 2), "%"))
+
+# utilidad relativa log
+Ulog_rel <- getUEval(
+  alpha_log, mu_hat, se_hat,
+  Xtrain, Xtest,
+  gammaLog, getSigmaMV,   # <--- EL PROFESOR QUIERE ESTA
+  check_log, Ulog
+)
+
+# añadir a evals
+evals <- c(evals, retLog = ret_log)
+evals <- c(evals, Ulog = Ulog_rel)
+
+print("---- MÉTRICAS ACUMULADAS ----")
+print(evals)
+
+```
 
 
 
 
 ```{r}
-source("eval_funcs.R")
+source("eval_funcss.R")
 
 
 ############################################
