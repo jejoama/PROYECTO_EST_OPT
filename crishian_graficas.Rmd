@@ -430,7 +430,7 @@ print(evals)
 
 #     GRAFICAS
 
-#Gráfica 1: Real vs Predicho (activo 1)
+#Gráfica 1: Real vs Predicho (activo)
 ```{r}
 library(ggplot2)
 
