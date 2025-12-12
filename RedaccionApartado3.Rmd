@@ -1,5 +1,5 @@
 ---
-title: "Proyecto Estadística y Optimización"
+title: "Proyecto Estadística y Optimización."
 output:
   pdf_document: default
   html_document: default
