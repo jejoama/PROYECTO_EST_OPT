@@ -125,6 +125,7 @@ evals
 
 
 
+
 #####################################
 # seccion 3 - utilidad media-varianza
 ###########################################################
@@ -233,7 +234,7 @@ getAlphaMVPos <- function(mu, Sigma, gamma){
 
 ```{r}
 # Definimos Gamma (aversión al riesgo)
-gammaMV <- 1 
+gammaMV <- 20
 
 # APARTADO 3.1: Optimización CON posiciones cortas
 print("--- RESULTADOS APARTADO 3.1 (CON CORTOS) ---")
@@ -259,7 +260,7 @@ print(paste("Rendimiento Final Acumulado:", round(ret_3_1 * 100, 2), "%"))
 ```
 
 ```{r}
-gammaMVPos <- 1
+gammaMVPos <- 20
 
 # APARTADO 3.2: Optimización SIN posiciones cortas (Solo largos)
 print(" ")
@@ -281,18 +282,12 @@ print(paste("¿Cumple restricciones (Suma=1 y Positivos)?:", check_3_2))
 
 ret_3_2 <- getRet(alpha_3_2, Xtest, check_3_2)
 print(paste("Rendimiento Final Acumulado:", round(ret_3_2 * 100, 2), "%"))
-# Utilidad relativa MV
-Umv_rel <- getUEval(
-  alpha_3_1, mu_hat, se_hat,
-  Xtrain, Xtest,
-  gammaMV, getSigmaMV,
-  check_3_1, Umv
-)
-
-# Añadir a evals
-evals <- c(evals, retMV = ret_3_1)
-evals <- c(evals, Umv = Umv_rel)
 ```
+
+
+
+
+
 ```{r}
 source("eval_funcs.R")
 
@@ -328,7 +323,7 @@ getAlphaLog <- function(mu, Sigma, gamma){
 }
 
 # 4.3 Parámetro gamma
-gammaLog <- 1
+gammaLog <- 20
 
 ############################################
 # EJECUCIÓN DEL APARTADO 4
@@ -366,6 +361,7 @@ Ulog_rel <- getUEval(
 # 
 evals <- c(evals, retLog = ret_log)
 evals <- c(evals, Ulog = Ulog_rel)
+#4.599
 
 ```
 
