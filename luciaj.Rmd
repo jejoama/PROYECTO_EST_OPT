@@ -334,6 +334,61 @@ evals <- c(evals, UmvPos = Umv_rel_3_2)
 # SECCIÓN 4 — UTILIDAD LOGARÍTMICA (CON CORTOS)
 ############################################
 
+gammaLog = 1 # INSERTAR VALOR EN REALES
+
+# Funcion para estimar la matriz de covarianzas entre los rendimientos de los 5
+# activos a partir de las desviaciones estándares (que vendran de su modelo Arima)
+# y el historico de rendimientos (que pueden usar para estimar correlaciones) 
+getSigmaLog <- function(sig, Xpast){
+  Sigma <- getSigmaMV(sig, Xpast)
+  return(Sigma)
+}
+
+# Funcion para optimizar la asignacion de cada activo dentro del portafolio
+# tomando en cuenta la utilidad log CON posiciones cortas
+getAlphaLog <- function(mu,Sigma, gamma){
+  # INPUT: mu: vector en R^5 con los rendimientos esperados de los 5 activos para el periodo t
+  #        Sigma: matriz en R^{5 x 5} con las covarianzas de los 5 activos
+  #        gamma: valor en R que representa el apetito de riesgo. Entre mas bajo mas riesgo.
+  # OUTPUT: alpha: vector en R^5 con la asignación elegida para los 5 activos resultante de optimizar
+  # U-log sujeto a que alpha sume a 1.
+  
+  #INSERTAR PASOS DE OPTIMIZACION
+  # Repetiremos la optimización hasta verificar que el alpha suma 1
+  comprobar_alpha <- TRUE
+  # Penalización para la restricción
+  penal <- 10
+  while(comprobar_alpha){
+    # Definición de la función a maximizar, con un parámetro de penalización
+    Ulog_penal <- function(alpha){
+      num <- log(1+t(alpha)%*%mu) - gamma*t(alpha)%*%Sigma%*%alpha
+      denom <- (2*(1+t(alpha)%*%mu)^2)
+      penal <- penal*(sum(alpha)-1)^2
+      
+      return(as.numeric(num/denom - penal))
+    }
+    # Tomamos como punto inicial de la iteración el resultado para el caso lineal
+    alpha_0 <- getAlphaMV(mu, Sigma, gamma)
+    
+    # Encontramos el óptimo con el algoritmo BFGS
+    # Podemos obtener a veces warnings si el logaritmo tiene argumento negativo y genera NaN
+    # Pero no es alarmante ya que optim simplemente considera este punto inviable y sigue iterando
+    res <- optim(par=alpha_0, fn =function(alpha) -Ulog_penal(alpha), method = "BFGS")
+    summary(res)
+    alpha <- res$par
+    # Comprobamos que suma 1 y si no aumentamos la penalización
+    if(sum(alpha)-1 < 1e-6){
+      # Si suma 1 se acaba aquí el bucle y devolveremos este alpha
+      comprobar_alpha <- FALSE
+    } else{
+      penal <- 10*penal
+    }
+  }
+  
+  return(alpha)
+}
+
+
 print("--- RESULTADOS APARTADO 4 (UTILIDAD LOG) ---")
 
 # gamma
