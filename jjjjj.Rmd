@@ -284,6 +284,39 @@ ret_3_2 <- getRet(alpha_3_2, Xtest, check_3_2)
 print(paste("Rendimiento Final Acumulado:", round(ret_3_2 * 100, 2), "%"))
 ```
 
+
+
+```{r}
+############################################
+# AÑADIR A evals — APARTADO 3
+############################################
+
+# Utilidad relativa MV (con cortos)
+Umv_rel_3_1 <- getUEval(
+  alpha_3_1, mu_hat, se_hat,
+  Xtrain, Xtest,
+  gammaMV, getSigmaMV,
+  check_3_1, Umv
+)
+
+evals <- c(evals, retMV = ret_3_1)
+evals <- c(evals, Umv = Umv_rel_3_1)
+
+# Utilidad relativa MVPos (sin cortos)
+Umv_rel_3_2 <- getUEval(
+  alpha_3_2, mu_hat, se_hat,
+  Xtrain, Xtest,
+  gammaMVPos, getSigmaMVPos,
+  check_3_2, Umv
+)
+
+evals <- c(evals, retMVPos = ret_3_2)
+evals <- c(evals, UmvPos = Umv_rel_3_2)
+
+```
+
+
+
 ```{r}
 ############################################
 # SECCIÓN 4 — UTILIDAD LOGARÍTMICA (CON CORTOS)
@@ -331,82 +364,4 @@ print(evals)
 ```
 
 
-
-
-```{r}
-source("eval_funcss.R")
-
-
-############################################
-# SECCIÓN 4 — UTILIDAD LOG (CON CORTOS)
-############################################
-
-# 4.1 Matriz de covarianzas: Sigma = D R D
-getSigmaLog <- function(sig, Xpast){
-  R <- cor(Xpast, use = "pairwise.complete.obs")
-  D <- diag(sig)
-  Sigma <- D %*% R %*% D
-  return(Sigma)
-}
-
-# 4.2 Optimización de la utilidad logarítmica (permitiendo cortos)
-getAlphaLog <- function(mu, Sigma, gamma){
-
-  n <- length(mu)
-  vec <- rep(1, n)
-
-  invSigma <- solve(Sigma)
-
-  # Lagrange multiplier
-  lambda <- (t(vec) %*% invSigma %*% mu - gamma) /
-            (t(vec) %*% invSigma %*% vec)
-
-  # Alpha óptimo
-  alpha <- (1/gamma) * invSigma %*% (mu - as.numeric(lambda) * vec)
-
-  return(as.numeric(alpha))
-}
-
-# 4.3 Parámetro gamma
-gammaLog <- 20
-
-############################################
-# EJECUCIÓN DEL APARTADO 4
-############################################
-
-print("--- RESULTADOS APARTADO 4 (UTILIDAD LOG) ---")
-
-alpha_log <- getAlpha_ts(
-  mus = mu_hat,
-  sigs = se_hat,
-  gamma = gammaLog,
-  getSigmaFunc = getSigmaLog,
-  getAlphaFunc = getAlphaLog,
-  Xtrain = Xtrain,
-  Xtest = Xtest
-)
-
-# Solo se exige suma=1 (permitimos cortos)
-check_log <- getChecks(alpha_log, mode = c("sum1"))
-print(paste("¿Cumple restricciones (suma=1)?:", check_log))
-
-# Rendimiento acumulado
-ret_log <- getRet(alpha_log, Xtest, check_log)
-print(paste("Rendimiento Final Acumulado:", round(ret_log * 100, 2), "%"))
-
-
-# Utilidad log relativa (comparada con alpha igual)
-Ulog_rel <- getUEval(
-  alpha_log, mu_hat, se_hat,
-  Xtrain, Xtest,
-  gammaLog, getSigmaLog,
-  check_log, Ulog
-)
-
-# 
-evals <- c(evals, retLog = ret_log)
-evals <- c(evals, Ulog = Ulog_rel)
-#4.599
-
-```
 
