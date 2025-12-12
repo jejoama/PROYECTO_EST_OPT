@@ -2,8 +2,8 @@
 title: "Proyecto Estadística y Optimización"
 date: "2025-12-15"
 output: 
-  pdf_document: default
   html_document: default
+  pdf_document: default
 header-includes:
   - \usepackage{titling}
   - \pretitle{\begin{center}\LARGE}
@@ -69,9 +69,26 @@ En este caso hemos obtenido un rendimiento de 0.62. A diferencia del caso anteri
 
 
 
+En un principio se ha hecho un análisis exploratorio y diagnótico de series temporales:
+Las cinco series de retornos muestran datos desde 2000 hasta ~2009.
+Se graficaron las cinco series temporales para evaluar visualmente su comportamiento. Algunas series muestran fluctuaciones más pronunciadas, lo que sugiere mayor volatilidad. No se observan patrones estacionales evidentes, lo que es coherente con series de retornos financieros.
 
 
+![Datos de las activos](images/series_temporales.png)
 
+Se realizó una descomposición aditiva de las series. En estos datos, por lo general, las cinco series muestran comportamiento típico de retornos financieros: fluctuaciones alrededor de cero, sin tendencia clara y con variabilidad irregular. No se observa estacionalidad evidente. Algunas series (como X2 y X4) presentan mayor volatilidad, mientras que otras (como X3) son más estables. El componente aleatorio captura la mayor parte de la variabilidad.
+
+Una visualización con la serie X1 sería la siguiente:
+![Datos de las activos](images/descomposicion.png)
+
+En todas las series temporales se observa que los residuos en el tiempo oscilan alrededor de cero sin patrones visibles, tampoco muestran tendencia ni cambios bruscos de varianza.
+
+El ACF de residuos, la mayoría de los lags están dentro de las bandas de confianza y no hay autocorrelación significativa. Y el PACF de residuos es igual que la ACF: sin picos relevantes. No hay estructura remanente por modelar.
+
+
+Los gráficos ACF y PACF de la series en general muestran un decaimiento lento  X1 muestran [describe el patrón: por ejemplo, decaimiento lento en ACF y corte abrupto en PACF], lo que sugiere un modelo AR(p) adecuado. Esta información guía la selección de parámetros en el modelo ARIMA.
+![Datos de las activos](images/residuos_arima.png)
+Los análisis de las series temporales indican que los retornos no exhiben tendencias o estacionalidades notables. Las descomposiciones corroboran que la mayor parte de la variabilidad se origina en el componente aleatorio. Las funciones ACF y PACF señalan que las series son adecuadas para el modelado ARIMA y presentan estacionaridad. Por último, los gráficos de residuos evidencian la falta de autocorrelación y un comportamiento de ruido blanco, lo que confirma que los modelos ARIMA ajustados son adecuados para prever la volatilidad y los retornos.
 
 
 

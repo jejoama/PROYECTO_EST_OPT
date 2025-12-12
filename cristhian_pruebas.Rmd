@@ -12,38 +12,45 @@ data <- read.csv("stock_returns_train.csv")
 
 # Convertir los datos a una serie temporal
 # Suponiendo que cada columna es una serie temporal
-X <- ts(data, start = c(2000, 1), frequency = 12)  # Aquí ajusta el 'start' y 'frequency' según corresponda
+X <- ts(data, start = c(2000, 1), frequency = 12)  # Ajusta el 'start' y 'frequency' según corresponda
 
-# Graficar las series temporales
-par(mfrow=c(2, 3))  # Configura una cuadrícula de gráficos
-plot(X[, 1], main="Serie X1", ylab="Valor", xlab="Tiempo")
-plot(X[, 2], main="Serie X2", ylab="Valor", xlab="Tiempo")
-plot(X[, 3], main="Serie X3", ylab="Valor", xlab="Tiempo")
-plot(X[, 4], main="Serie X4", ylab="Valor", xlab="Tiempo")
-plot(X[, 5], main="Serie X5", ylab="Valor", xlab="Tiempo")
+# Configura la cuadrícula para los gráficos (2 filas, 3 columnas)
+par(mfrow=c(2, 3))
 
-# Descomponer la primera serie (X1) como ejemplo
-decomposed_X1 <- decompose(X[, 1])
+# Graficar todas las series temporales
+for (i in 1:ncol(X)) {
+  plot(X[, i], main=paste("Serie X", i), ylab="Valor", xlab="Tiempo")
+}
 
-# Graficar la descomposición
-plot(decomposed_X1)
-
-# Realizar la prueba de Dickey-Fuller Aumentada para la primera serie
-adf.test(X[, 1])
-
-# Graficar ACF y PACF para la primera serie (X1)
-acf(X[, 1], main="ACF - X1")
-pacf(X[, 1], main="PACF - X1")
-
-# Ajustar el modelo ARIMA automáticamente
-fit_X1 <- auto.arima(X[, 1])
-
-# Ver el resumen del modelo
-summary(fit_X1)
-
-# Graficar los residuos del modelo ajustado
-tsdisplay(residuals(fit_X1), main="Residuos del Modelo ARIMA")
-
+# Realizar el análisis para cada serie temporal
+for (i in 1:ncol(X)) {
+  
+  # Descomponer cada serie temporal
+  decomposed <- decompose(X[, i])
+  
+  # Graficar la descomposición
+  plot(decomposed)
+  
+  # Realizar la prueba de Dickey-Fuller Aumentada para cada serie
+  cat("Prueba ADF para la Serie X", i, ":\n")
+  print(adf.test(X[, i]))
+  
+  # Graficar ACF y PACF para cada serie
+  acf(X[, i], main=paste("ACF - X", i))
+  pacf(X[, i], main=paste("PACF - X", i))
+  
+  # Ajustar el modelo ARIMA automáticamente
+  fit <- auto.arima(X[, i])
+  
+  # Ver el resumen del modelo
+  cat("Resumen del modelo ARIMA para la Serie X", i, ":\n")
+  print(summary(fit))
+  
+  # Graficar los residuos del modelo ajustado
+  tsdisplay(residuals(fit), main=paste("Residuos del Modelo ARIMA - X", i))
+  
+  cat("\n")  # Salto de línea para mejorar la visualización en consola
+}
 
 ```
 Los resultados de la prueba de Dickey-Fuller Aumentada (ADF) con el valor negativo indican que hay evidencia en contra de la hipótesis nula (es decir, que no es estacionaria). Con el p_value a 0.01 rechazamos la hipótesis de que sea una serie no estacionaria.
