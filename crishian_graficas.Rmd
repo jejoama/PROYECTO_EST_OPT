@@ -73,11 +73,11 @@ for (i in 1:ncol(train_serie)){
 getPred <- function(x_train, x_test_past){
   mod <- auto.arima(x_train, stepwise = FALSE, approximation = FALSE)
   x_past = c(x_train, x_test_past)
-  #fit_upd <- Arima(x_past, model = mod)
-  #fc <- forecast::forecast(fit_upd, h = 1)
+  fit_upd <- Arima(x_past, model = mod)
+  fc <- forecast::forecast(fit_upd, h = 1)
   
-  mod <- auto.arima(x_past, stepwise = FALSE, approximation = FALSE)
-  fc <- forecast(mod, h = 1)
+  #mod <- auto.arima(x_past, stepwise = FALSE, approximation = FALSE)
+  #fc <- forecast(mod, h = 1)
 
   mu_hat  <- as.numeric(fc$mean[1])
   z80 <- qnorm(0.8)
@@ -437,7 +437,7 @@ print(evals)
 #Gráfica 1: Real vs Predicho (activo)
 ```{r}
 library(ggplot2)
-
+par(mfrow = c(2, 3))
 for(i in 1:5){
   df <- data.frame(
     t = 1:nrow(Xtest),
