@@ -36,10 +36,10 @@ filas_train <- nrow(train)
 #Hemos pensando en dividirlo en 80% train vs 20% Test
 
 #Entrenamiento --> 96 primeros
-x_train <- window(train_serie, start=1, end=floor(0.8*filas_train))
+Xtrain <- window(train_serie, start=1, end=floor(0.8*filas_train))
 
 # Validación: 24 ultimos
-x_test <- window(train_serie, start=floor(0.8*filas_train)+1, end=filas_train)
+Xtest <- window(train_serie, start=floor(0.8*filas_train)+1, end=filas_train)
 
 ```
 
@@ -287,6 +287,7 @@ print(paste("Rendimiento Final Acumulado:", round(ret_3_2 * 100, 2), "%"))
 
 
 ```{r}
+source('eval_funcss.R')
 # Utilidad relativa MV (con cortos)
 Umv_rel_3_1 <- getUEval(
   alpha_3_1, mu_hat, se_hat,
@@ -310,7 +311,6 @@ evals <- c(evals, retMVPos = ret_3_2)
 evals <- c(evals, UmvPos = Umv_rel_3_2)
 
 ```
-
 
 
 ```{r}
@@ -346,7 +346,7 @@ print(paste("Rendimiento Final Acumulado:", round(ret_log * 100, 2), "%"))
 Ulog_rel <- getUEval(
   alpha_log, mu_hat, se_hat,
   Xtrain, Xtest,
-  gammaLog, getSigmaMV, 
+  gammaLog, getSigmaMV,   # <--- EL PROFESOR QUIERE ESTA
   check_log, Ulog
 )
 
@@ -359,5 +359,5 @@ print(evals)
 
 ```
 
-
+```
 
