@@ -1,0 +1,37 @@
+---
+title: "Proyecto Estadística y Optimización"
+output:
+  pdf_document: default
+  html_document: default
+date: "2025-12-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+A continuación se describen las funciones utilizadas para obtener los pesos óptimos, $\alpha_t$, para cada activo en $t=T+1, ..., T+r$ y el rendimiento acumulado total. Te ndremos en cuenta dos casos: (3.1) permitiendo posiciones cortas y (3.2) restringiéndolas ($\alpha_t \geq 0$). Para ello se debe optimizar la función utilidad media-varianza, $U_{MV}$, para obtener estos pesos y así obtener el mejor rendimiento mitigando el riesgo. 
+
+Si nos fijamos en la función utilidad media-varianza,
+$$U_{MV}=\alpha_t^T\mu_t-\frac{\gamma}{2}\alpha_t^T\Sigma_t\alpha_t,$$
+$\mu_t$ corresponden a los valores esperados de los rendimientos calculados en el apartado anterior; $\Sigma_t$ es una matriz calculada a partir de la función `getSigmaMV` (como se indica en el enunciado); $\gamma$ es el coeficiente de aversión al riesgo (que controla el peso que se le da a la varianza).
+
+Ahora bien, considerando el primer caso (permitiendo posiciones cortas), para obtener un peso en un periodo $t$ utilizamos la función `getAlphaMV`. Esta función ha sido determinada a partir del método de los multiplicadores de Lagrange bajo la restricción $\sum_i \alpha_{ti}=1$. Y para calcular los pesos para cada activo, hemos utilizado la función `getAlpha_ts` (proporcionada) donde sus variables de entrada son `mus` ($\mu_t$), `sigs` ($se_{hat}$), $\gamma$ (que hemos fijado a 20, penalizando fuertemente el riesgo), `getSigmaFunc` que es `getSigmaMV`, `getAlphaFunc` es `getAlphaMV`, y `Xtrain` y `Xtest` los rendimientos para train y test. También, dentro de `getAlpha_ts` se llama a la función `getAlpha` que combina las funciones `getAlphaMV` y `getSigmaMV`. Por último, hemos utilizado la función `getChecks` para verificar que se cumple la restricción mencionada anteriormente ($\sum_i \alpha_{ti}=1$).
+
+Y para calcular el rendimiento total hemos utilizado la función `getRet` (proporcionada). En este caso hemos obtenido un rendimiento total de 2.95.
+
+Por otro lado, para el caso de posiciones largas (3.2), hemos realizado exactamente el mismo procedimiento, excepto para el cálculo de $\alpha_t$ ya que tenemos que tener en cuenta que solo se consideran valores positivos (además de la restricción de la suma de todos los pesos). Hemos utilizado la función `getAlphaMVPos` donde se ha hecho uso de `solve.QP` del paquete `quadprog`, que permite resolver problemas de optimización cuadrática sujeta a restricciones lineales.
+
+En este caso hemos obtenido un rendimiento de 0.62. A diferencia del caso anterior donde habíamos obtenido un 2.95. Puede ser debido a que al restringir únicamente a pesos positivos, limitamos más las combinaciones posibles (elimina la posibilidad de de neutralizar riesgo con cortos) y, por tanto, reduce las posibilidades de obtener una mejor rentabilidad.
+
+
+
+
+
+
+
+
+
+
+
+
