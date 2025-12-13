@@ -25,7 +25,7 @@ author: |
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Predicción del rendimiento
+# Predicción del Rendimiento
 
 En todas las series temporales se observa que los residuos en el tiempo oscilan alrededor de cero sin patrones visibles, tampoco muestran tendencia ni cambios bruscos de varianza.
 
@@ -81,7 +81,7 @@ Por otro lado, para el caso de posiciones largas (3.2), hemos realizado exactame
 En este caso hemos obtenido un rendimiento de 0.62. A diferencia del caso anterior donde habíamos obtenido un 2.95. Puede ser debido a que al restringir únicamente a pesos positivos, limitamos más las combinaciones posibles (elimina la posibilidad de de neutralizar riesgo con cortos) y, por tanto, reduce las posibilidades de obtener una mejor rentabilidad.
 
 
-# Log-utilidad
+# Log-Utilidad
 En esta sección trataremos de optimizar nuestra cartera de inversiones respecto de la función de utilidad logarítmica, que reconoce la naturaleza compuesta del rendimiento del portafolio. Concretamente se aproximará la función por Taylor a segundo orden, obteniendo:
 $$ U_{log}(\alpha_t;\mu_t;\Sigma_t) \approx  log(1+\alpha_t^T\mu_t) - \frac{\gamma}{2} \frac{\alpha_t^T \Sigma_t \alpha_t}{(1+\alpha_t^T\mu_t)^2}$$
 Escogeremos, al igual que en el apartado anterior, un valor para el parámetro de riesgo $\gamma=20$, y realizaremos también la misma estimación para la matriz $\Sigma_t$.  
@@ -93,15 +93,11 @@ Para encontrar el $\alpha$ óptimo se utilizará la función `optim` de R, el pr
 Este proceso se incluye en la función `getAlphaLog` que se aplicará sobre todo el periodo de test con la función `getAlpha_ts` y tras ello evaluaremos su rendimiento con `getRet` y la utilidad relativa logarítmica con `Ulog_rel`.  
 Obtenemos para nuestro periodo de test un rendimiento de 4.5954 y una utilidad relativa de 7.8182.
 
-# Otro apartado o añadido a alguno anterior/las conclusiones? perdón no lo tengo claro ponedlo donde queráis
+# Resultados
 Los resultados de las predicciones en estos casos nunca son exactos porque en mercados financieros los retornos son muy ruidosos, y el valor esperado suele ser más suave.
 En este caso, en la imagen de la $figura 1$, se observa cómo en los 5 activos la línea azul (predicha) es más estable, pues ARIMA filtra el ruido de alta frecuencia.
 Concretamente, en los activos 1, 4 y 5 se observan cambios de nivel, ARIMA se está adaptando lentamente (esto puede ser debido a alguna dependencia temporal débil).
-Y los activos 2 y 3 son los más cercanos a ruido blanco. Su retorno retorno real oscila al rededor de 0, y su predicción es más aplanada.
-
-
-
-En la imagen de la $figura 2$ se observa la representación de cómo se asiganan los pesos promedio de inversión en cada activo en el periodo de testeo bajo el modelo de utilidad media-varianza con posiciones cortas permitidas.
+Y los activos 2 y 3 son los más cercanos a ruido blanco. Su retorno retorno real oscila al rededor de 0, y su predicción es más aplanada. En la imagen de la $figura 2$ se observa la representación de cómo se asiganan los pesos promedio de inversión en cada activo en el periodo de testeo bajo el modelo de utilidad media-varianza con posiciones cortas permitidas.
 
 El activo 5 tiene el peso promedio más alto (~0.8), es decir, posee un rendimiento esperado alto y una volatilidad controlad, el modelo confía bastante en este activo. Los activos 1 y 4 presentan pesos positivos moderados (~0.4), son buenos, pero no hay tanta convicción. Los activos 2 y 3 muestran características menos atractivas (ya sea por bajo rendimiento esperado o alta volatilidad relativa), lo que lleva al modelo a asignarles posiciones cortas.
 
@@ -124,11 +120,14 @@ La gráfica siguiente ilustra cómo ha cambiado el portafolio creado bajo la nor
 
 ![Uitilidad Log](images/evolucion_utilidad_log.png){width=50%}
 
-# Resultados finales
-Para todo nuestro periodo de test las métricas obtenidas para los modelos y la optimización de la utilidad han sido:
+# Resumen Resultados Finales
 
 |     RMSE   | Rend. UMV ($\alpha \in \mathbb{R}$, $\gamma=20$) | Urel MV ($\alpha \in \mathbb{R}$, $\gamma=20$) | Rend. UMV ($\alpha \in \mathbb{R}^+$, $\gamma=20$) | Urel MV ($\alpha \in \mathbb{R}^+$, $\gamma=20$) | Rend. Ulog ($\alpha \in \mathbb{R}$, $\gamma=20$) | Urel log ($\alpha \in \mathbb{R}$, $\gamma=20$) |
 |:----------:|:---------------------------------------------------:|:--------------------------------------------------------:|:---------------------------------------------------:|:--------------------------------------------------------:|:----------------------------------------------------:|:---------------------------------------------------------:|
 | 0.0175 |                      2.9515                    |                        7.0117                       |                      0.6212                     |                        3.1182                       |                       4.5954                       |                         7.8182                        |
 
-
+# Distribución Trabajo
+Apartado 2: Jeremy Joel Aguilar Marin.
+Apartado 3: Irene Barba La Orden - Fabián Calvo Castillo
+Apartado 4: Lucía Benages Guijarro
+Gráficos Resumen: Cristhian Torrico Castellon
