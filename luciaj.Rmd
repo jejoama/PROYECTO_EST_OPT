@@ -334,7 +334,7 @@ evals <- c(evals, UmvPos = Umv_rel_3_2)
 # SECCIÓN 4 — UTILIDAD LOGARÍTMICA (CON CORTOS)
 ############################################
 
-gammaLog = 1 # INSERTAR VALOR EN REALES
+gammaLog <- 1 # INSERTAR VALOR EN REALES
 
 # Funcion para estimar la matriz de covarianzas entre los rendimientos de los 5
 # activos a partir de las desviaciones estándares (que vendran de su modelo Arima)
@@ -357,7 +357,7 @@ getAlphaLog <- function(mu,Sigma, gamma){
   # Repetiremos la optimización hasta verificar que el alpha suma 1
   comprobar_alpha <- TRUE
   # Penalización para la restricción
-  penal <- 10
+  penal <- 1
   while(comprobar_alpha){
     # Definición de la función a maximizar, con un parámetro de penalización
     Ulog_penal <- function(alpha){
