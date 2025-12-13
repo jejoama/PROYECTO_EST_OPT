@@ -25,7 +25,7 @@ author: |
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Predicción del Rendimiento
+# 2. Predicción del Rendimiento
 
 En todas las series temporales se observa que los residuos en el tiempo oscilan alrededor de cero sin patrones visibles, tampoco muestran tendencia ni cambios bruscos de varianza.
 
@@ -64,7 +64,7 @@ Despues "construye" dos matrices:
 
 Finalmente, se calcula el RMSE para evaluar la calidad de las predicciones. En nuestro caso, el RMSE obtenido fue de 0.0175, lo que indica que, en promedio, el modelo comete un error del 1.75% en la predicción de los rendimientos diarios. Este nivel de error es razonable para datos financieros, que suelen presentar alta volatilidad. 
 
-# Utilidad Media-Varianza
+# 3. Utilidad Media-Varianza
 
 A continuación se describen las funciones utilizadas para obtener los pesos óptimos, $\alpha_t$, para cada activo en $t=T+1, ..., T+r$ y el rendimiento acumulado total. Tendremos en cuenta dos casos: (3.1) permitiendo posiciones cortas y (3.2) restringiéndolas ($\alpha_t \geq 0$). Para ello se debe optimizar la función utilidad media-varianza, $U_{MV}$, para obtener estos pesos y así obtener el mejor rendimiento mitigando el riesgo. 
 
@@ -81,7 +81,7 @@ Por otro lado, para el caso de posiciones largas (3.2), hemos realizado exactame
 En este caso hemos obtenido un rendimiento de 0.62. A diferencia del caso anterior donde habíamos obtenido un 2.95. Puede ser debido a que al restringir únicamente a pesos positivos, limitamos más las combinaciones posibles (elimina la posibilidad de de neutralizar riesgo con cortos) y, por tanto, reduce las posibilidades de obtener una mejor rentabilidad.
 
 
-# Log-Utilidad
+# 4. Log-Utilidad
 En esta sección trataremos de optimizar nuestra cartera de inversiones respecto de la función de utilidad logarítmica, que reconoce la naturaleza compuesta del rendimiento del portafolio. Concretamente se aproximará la función por Taylor a segundo orden, obteniendo:
 $$ U_{log}(\alpha_t;\mu_t;\Sigma_t) \approx  log(1+\alpha_t^T\mu_t) - \frac{\gamma}{2} \frac{\alpha_t^T \Sigma_t \alpha_t}{(1+\alpha_t^T\mu_t)^2}$$
 Escogeremos, al igual que en el apartado anterior, un valor para el parámetro de riesgo $\gamma=20$, y realizaremos también la misma estimación para la matriz $\Sigma_t$.  
@@ -93,7 +93,7 @@ Para encontrar el $\alpha$ óptimo se utilizará la función `optim` de R, el pr
 Este proceso se incluye en la función `getAlphaLog` que se aplicará sobre todo el periodo de test con la función `getAlpha_ts` y tras ello evaluaremos su rendimiento con `getRet` y la utilidad relativa logarítmica con `Ulog_rel`.  
 Obtenemos para nuestro periodo de test un rendimiento de 4.5954 y una utilidad relativa de 7.8182.
 
-# Resultados
+# 5. Resultados
 Los resultados de las predicciones en estos casos nunca son exactos porque en mercados financieros los retornos son muy ruidosos, y el valor esperado suele ser más suave.
 En este caso, en la imagen de la $figura 1$, se observa cómo en los 5 activos la línea azul (predicha) es más estable, pues ARIMA filtra el ruido de alta frecuencia.
 Concretamente, en los activos 1, 4 y 5 se observan cambios de nivel, ARIMA se está adaptando lentamente (esto puede ser debido a alguna dependencia temporal débil).
@@ -130,4 +130,4 @@ La gráfica siguiente ilustra cómo ha cambiado el portafolio creado bajo la nor
 Apartado 2: Jeremy Joel Aguilar Marin.
 Apartado 3: Irene Barba La Orden - Fabián Calvo Castillo
 Apartado 4: Lucía Benages Guijarro
-Gráficos Resumen: Cristhian Torrico Castellon
+Apartado 5: Cristhian Torrico Castellon
