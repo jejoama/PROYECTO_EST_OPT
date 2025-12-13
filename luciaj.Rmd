@@ -328,13 +328,19 @@ evals <- c(evals, UmvPos = Umv_rel_3_2)
 ```
 
 
-
+# 4. Log-utilidad
+En esta sección trataremos de optimizar nuestra cartera de inversiones respecto de la función de utilidad logarítmica, que reconoce la naturaleza compuesta del rendimiento del portafolio. Concretamente se aproximará la función por Taylor a segundo orden, obteniendo:
+$$ U_{log}(\alpha_t;\mu_t;\Sigma_t) \approx  log(1+\alpha_t^T\mu_t) - \frac{\gamma}{2} \frac{\alpha_t^T \Sigma_t \alpha_t}{(1+\alpha_t^T\mu_t)^2}$$
+Escogeremos, al igual que en el apartado anterior, un valor para el parámetro de riesgo $\gamma=20$, y realizaremos también la misma estimación para la matriz $\Sigma_t$.  
+También se permitirá en este caso utilizar posiciones cortas respecto de los activos, es decir, valores de $\alpha_{ti}$ negativos, pero están sujetos a la restricción de que deben sumar 1: $\sum_i\alpha_{ti}=1$.  
+Para realizar la optimización en primer lugar redefiniremos la función $U_{log}$ añadiendo un término de penalización, que minimizará la función si no se respeta $\sum_i\alpha_{ti}=1$, la función queda entonces con la forma:  
+$$ U_{log}^{penal}(\alpha_t;\mu_t;\Sigma_t) \approx  log(1+\alpha_t^T\mu_t) - \frac{\gamma}{2} \frac{\alpha_t^T \Sigma_t \alpha_t}{(1+\alpha_t^T\mu_t)^2} - \rho (\Sigma_i\alpha_{ti}-1)^2 $$
+Tras realizar la optimización se verificará que esta restricción se verifica y si no se aumentará el parámetro de penalización $\rho$.  
+Para encontrar el $\alpha$ óptimo se utilizará la función `optim` de R, el proceso tendrá dos fases: en un primer lugar utilizaremos el método *Nelder-Mead* para encontrar un primer óptimo partiendo del punto $\alpha^T=(0.2,0.2,0.2,0.2,0.2)$ y después mejoraremos el óptimo encontrado aplicando el método *BFGS* sobre el resultado. Este proceso se incluye en la función `GetAlphaLog` que se aplicará sobre todo el periodo de test.
 ```{r}
 ############################################
 # SECCIÓN 4 — UTILIDAD LOGARÍTMICA (CON CORTOS)
 ############################################
-
-gammaLog <- 1 # INSERTAR VALOR EN REALES
 
 # Funcion para estimar la matriz de covarianzas entre los rendimientos de los 5
 # activos a partir de las desviaciones estándares (que vendran de su modelo Arima)
@@ -357,7 +363,7 @@ getAlphaLog <- function(mu,Sigma, gamma){
   # Repetiremos la optimización hasta verificar que el alpha suma 1
   comprobar_alpha <- TRUE
   # Penalización para la restricción
-  penal <- 1
+  penal <- 10
   while(comprobar_alpha){
     # Definición de la función a maximizar, con un parámetro de penalización
     Ulog_penal <- function(alpha){
@@ -366,15 +372,18 @@ getAlphaLog <- function(mu,Sigma, gamma){
       
       return(as.numeric(ulog - penal))
     }
-    # Tomamos como punto inicial de la iteración el resultado para el caso lineal
-    alpha_0 <- getAlphaMV(mu, Sigma, gamma)
-    
-    # Encontramos el óptimo con el algoritmo BFGS
+    # Partimos de un alpha cualquiera y hacemos primero una optimización con el método Nelder-Mead para encontrar 
+    # un punto de inicio para optimizar
     # Podemos obtener a veces warnings si el logaritmo tiene argumento negativo y genera NaN
+    alpha_0 <- rep(1/5,5)
+    res_nm <- suppressWarnings(optim(par=alpha_0, fn =function(alpha) -Ulog_penal(alpha), method = "Nelder-Mead"))
+    alpha_nm <- res_nm$par
+    # Encontramos un mejor óptimo con el algoritmo BFGS
     # Pero no es alarmante ya que optim simplemente considera este punto inviable y sigue iterando
-    res <- optim(par=alpha_0, fn =function(alpha) -Ulog_penal(alpha), method = "BFGS")
+    res <- suppressWarnings(optim(par=alpha_nm, fn =function(alpha) -Ulog_penal(alpha), method = "BFGS"))
     summary(res)
     alpha <- res$par
+    
     # Comprobamos que suma 1 y si no aumentamos la penalización
     if(sum(alpha)-1 < 1e-6){
       # Si suma 1 se acaba aquí el bucle y devolveremos este alpha
@@ -383,7 +392,6 @@ getAlphaLog <- function(mu,Sigma, gamma){
       penal <- 10*penal
     }
   }
-  
   return(alpha)
 }
 
@@ -398,12 +406,12 @@ alpha_log <- getAlpha_ts(
   mus = mu_hat,
   sigs = se_hat,
   gamma = gammaLog,
-  getSigmaFunc = getSigmaMV,     
+  getSigmaFunc = getSigmaLog,     
   getAlphaFunc = getAlphaLog,    
   Xtrain = Xtrain,
   Xtest = Xtest
 )
-
+print(alpha_log)
 # comprobación de restricciones (solo suma=1)
 check_log <- getChecks(alpha_log, mode = c("sum1"))
 print(paste("¿Cumple restricciones (suma=1)?:", check_log))
@@ -421,10 +429,94 @@ Ulog_rel <- getUEval(
 )
 
 # añadir a evals
-evals <- c(evals, retLog = ret_log)
-evals <- c(evals, Ulog = Ulog_rel)
+evals <- c(retLog = ret_log, Ulog = Ulog_rel)
+#evals <- c(evals, retLog = ret_log)
+#evals <- c(evals, Ulog = Ulog_rel)
+```
 
+
+```{r}
 print("---- MÉTRICAS ACUMULADAS ----")
 print(evals)
+```
+```{r}
+mu <- mu_hat[16,]
+Sigma <- getSigmaMV(se_hat[16,],Xtrain)
+gamma <- gammaLog
+penal <- 5
 
+Ulog_penal <- function(alpha){
+      ulog <- Ulog(alpha, gamma, mu, Sigma)
+      penal <- penal*(sum(alpha)-1)^2
+      
+      return(as.numeric(ulog - penal))
+}
+
+# Prueba de puntos iniciales
+alpha <- rep(1/5,5)
+i <- 0
+while(i<5){
+  alpha_0 <- runif(5,min=-50,max=50)
+  if(sum(alpha_0*mu)-1<=0){
+    next
+  } else{
+    res <- optim(par=alpha_0, fn =function(alpha) -Ulog_penal(alpha), method = "BFGS")
+    if(Ulog(res$par,gamma,mu,Sigma)>Ulog(alpha,gamma,mu,Sigma)){
+      alpha <- res$par
+    }
+  }
+  i <- i+1
+}
+print(alpha)
+print(Ulog(alpha,gamma,mu,Sigma))
+
+alpha_0 <- rep(1/5,5)
+res_nm <- suppressWarnings(optim(par=alpha_0, fn =function(alpha) -Ulog_penal(alpha), method = "Nelder-Mead"))
+alpha_nm <- res_nm$par
+res <- optim(par=alpha_nm, fn =function(alpha) -Ulog_penal(alpha), method = "BFGS")
+alpha <- res$par
+print(alpha)
+print(Ulog(alpha,gamma,mu,Sigma))
+```
+
+```{r}
+# 7.81716948
+# 7.81716984
+# 7.82004646
+# 7.81822939
+mu <- mu_hat[1,]
+Sigma <- getSigmaMV(se_hat[1,],Xtrain)
+gamma <- gammaLog
+penal <- 5
+
+Ulog_penal <- function(alpha){
+      ulog <- Ulog(alpha, gamma, mu, Sigma)
+      penal <- penal*(sum(alpha)-1)^2
+      
+      return(as.numeric(ulog - penal))
+}
+
+Ulog <- function(alpha, gamma, mu_hat, Sigma_hat){
+  Er <- sum(alpha*mu_hat)
+  logTerm <- log(1+Er)
+  riskTerm <- (t(alpha)%*%Sigma_hat%*%alpha)[1,1] / (1+Er)^2
+  res <- logTerm -(gamma/2)*riskTerm
+  
+  return(res)
+}
+
+alpha_0 <- getAlphaMV(mu, Sigma, gamma)
+
+res <- optim(par=alpha_0, fn =function(alpha) -Ulog_penal(alpha), method = "BFGS")
+alpha_prim <- res$par
+
+res_nm <- optim(par=alpha_0, fn =function(alpha) -Ulog_penal(alpha), method = "Nelder-Mead")
+alpha_nm <- res_nm$par
+
+res <- optim(par=alpha_nm, fn =function(alpha) -Ulog_penal(alpha), method = "BFGS")
+alpha <- res$par
+
+Ulog(alpha_prim, gamma, mu, Sigma)
+Ulog(alpha_nm, gamma, mu, Sigma)
+Ulog(alpha, gamma, mu, Sigma)
 ```
