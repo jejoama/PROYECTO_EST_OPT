@@ -2,8 +2,10 @@
 title: "Proyecto Estadística y Optimización"
 date: "2025-12-15"
 output: 
-  html_document: default
+  #html_document: default
   pdf_document: default
+geometry: margin=1.2in
+
 header-includes:
   - \usepackage{titling}
   - \pretitle{\begin{center}\LARGE}
@@ -19,6 +21,30 @@ author: |
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+En un principio se ha hecho un análisis exploratorio y diagnótico de series temporales:
+Las cinco series de retornos muestran datos desde 2000 hasta ~2009.
+Se graficaron las cinco series temporales para evaluar visualmente su comportamiento. Algunas series muestran fluctuaciones más pronunciadas, lo que sugiere mayor volatilidad. No se observan patrones estacionales evidentes, lo que es coherente con series de retornos financieros.
+
+
+![Datos de las activos](images/series_temporales.png)
+
+Se realizó una descomposición aditiva de las series. En estos datos, por lo general, las cinco series muestran comportamiento típico de retornos financieros: fluctuaciones alrededor de cero, sin tendencia clara y con variabilidad irregular. No se observa estacionalidad evidente. Algunas series (como X2 y X4) presentan mayor volatilidad, mientras que otras (como X3) son más estables. El componente aleatorio captura la mayor parte de la variabilidad.
+
+Una visualización con la serie X1 sería la siguiente:
+
+![Descomposición](images/descomposicion.png){width=70%}
+
+
+En todas las series temporales se observa que los residuos en el tiempo oscilan alrededor de cero sin patrones visibles, tampoco muestran tendencia ni cambios bruscos de varianza.
+
+El ACF de residuos, la mayoría de los lags están dentro de las bandas de confianza y no hay autocorrelación significativa. Y el PACF de residuos es igual que la ACF: sin picos relevantes. No hay estructura remanente por modelar.
+
+
+Los gráficos ACF y PACF de la series en general muestran un decaimiento lento  X1 muestran [describe el patrón: por ejemplo, decaimiento lento en ACF y corte abrupto en PACF], lo que sugiere un modelo AR(p) adecuado. Esta información guía la selección de parámetros en el modelo ARIMA.
+![Residuos del Modelo ARIMA](images/residuos_arima.png)
+
+Los análisis de las series temporales indican que los retornos no exhiben tendencias o estacionalidades notables. Las descomposiciones corroboran que la mayor parte de la variabilidad se origina en el componente aleatorio. Las funciones ACF y PACF señalan que las series son adecuadas para el modelado ARIMA y presentan estacionaridad. Por último, los gráficos de residuos evidencian la falta de autocorrelación y un comportamiento de ruido blanco, lo que confirma que los modelos ARIMA ajustados son adecuados para prever la volatilidad y los retornos.
 
 Para poder hacer un pronóstico de los rendimientos futuros de los 5 activos del CSV stock_returns_trains_2.csv hemos empleado modelos ARIMA univariados, ajustados mediante la función `auto.arima` (correspondiente a la librería: `forecast`). Esto lo que nos quiere decir es que si el rendimiento de hoy depende un poco del rendimiento de ayer, el modelo ARIMA lo detecta, ya que nuestro modelo ARIMA lo que hace es detectar los patrones en el tiempo, todo y que estos patrones sean o no insignificantes. Además, hay que tener en cuenta que ARIMA NO sobreajusta, no se inventa patrones inexistentes. Lo explicado con anterioridad es adecuado para series financieras con autocorrelación débil.
 
@@ -68,31 +94,6 @@ Por otro lado, para el caso de posiciones largas (3.2), hemos realizado exactame
 En este caso hemos obtenido un rendimiento de 0.62. A diferencia del caso anterior donde habíamos obtenido un 2.95. Puede ser debido a que al restringir únicamente a pesos positivos, limitamos más las combinaciones posibles (elimina la posibilidad de de neutralizar riesgo con cortos) y, por tanto, reduce las posibilidades de obtener una mejor rentabilidad.
 
 
-
-En un principio se ha hecho un análisis exploratorio y diagnótico de series temporales:
-Las cinco series de retornos muestran datos desde 2000 hasta ~2009.
-Se graficaron las cinco series temporales para evaluar visualmente su comportamiento. Algunas series muestran fluctuaciones más pronunciadas, lo que sugiere mayor volatilidad. No se observan patrones estacionales evidentes, lo que es coherente con series de retornos financieros.
-
-
-![Datos de las activos](images/series_temporales.png)
-
-Se realizó una descomposición aditiva de las series. En estos datos, por lo general, las cinco series muestran comportamiento típico de retornos financieros: fluctuaciones alrededor de cero, sin tendencia clara y con variabilidad irregular. No se observa estacionalidad evidente. Algunas series (como X2 y X4) presentan mayor volatilidad, mientras que otras (como X3) son más estables. El componente aleatorio captura la mayor parte de la variabilidad.
-
-Una visualización con la serie X1 sería la siguiente:
-![Descomposición](images/descomposicion.png)
-
-En todas las series temporales se observa que los residuos en el tiempo oscilan alrededor de cero sin patrones visibles, tampoco muestran tendencia ni cambios bruscos de varianza.
-
-El ACF de residuos, la mayoría de los lags están dentro de las bandas de confianza y no hay autocorrelación significativa. Y el PACF de residuos es igual que la ACF: sin picos relevantes. No hay estructura remanente por modelar.
-
-
-Los gráficos ACF y PACF de la series en general muestran un decaimiento lento  X1 muestran [describe el patrón: por ejemplo, decaimiento lento en ACF y corte abrupto en PACF], lo que sugiere un modelo AR(p) adecuado. Esta información guía la selección de parámetros en el modelo ARIMA.
-![Residuos del Modelo ARIMA](images/residuos_arima.png)
-
-Los análisis de las series temporales indican que los retornos no exhiben tendencias o estacionalidades notables. Las descomposiciones corroboran que la mayor parte de la variabilidad se origina en el componente aleatorio. Las funciones ACF y PACF señalan que las series son adecuadas para el modelado ARIMA y presentan estacionaridad. Por último, los gráficos de residuos evidencian la falta de autocorrelación y un comportamiento de ruido blanco, lo que confirma que los modelos ARIMA ajustados son adecuados para prever la volatilidad y los retornos.
-
-
-
 Los resultados de las predicciones en estos casos nunca son exactos porque en mercados financieros los retornos son muy ruidosos, y el valor esperado suele ser más suave.
 En este caso, en la imagen se observa cómo en los 5 activos la línea azul (predicha) es más estable, pues ARIMA filtra el ruido de alta frecuencia.
 Concretamente, en los activos 1, 4 y 5 se observan cambios de nivel, ARIMA se está adaptando lentamente (esto puede ser devido a alguna dependencia temporal débil).
@@ -104,7 +105,7 @@ La volatilidad de estos activos se estimó como la desviación estándar del pro
 Dado que ARIMA asume varianza constante en los errores, la volatilidad estimada resulta prácticamente constante en el periodo test para la mayoría de los activos, lo cual es consistente con las hipótesis del modelo.
 
 En la gráfica se observa que el activo 1 se observa una leve pendiente o cambio suave. Esto ocurre porque el modelo ARIMA se reestima dinámicamente al incorporar nuevos datos, la estimación de 
-𝜎^2 puede ajustarse ligeramente, especialmente si el modelo incluye integración (d > 0) o cambios en residuos. Con esto se cumple que la diagonal de Σ𝑡será constante en 𝑡, lo cual simplifica la optimización.
+$\sigma^2$ puede ajustarse ligeramente, especialmente si el modelo incluye integración (d > 0) o cambios en residuos. Con esto se cumple que la diagonal de  $\sum_{t}$ será constante en $t$, lo cual simplifica la optimización.
 
 En los demás activos, el modelo ARIMA clásico modela la media condicional del proceso, no modela volatilidad dinámica, asume que los errores tienen varianza constante. Es por ello que los intervalos de predicción tienen ancho casi constante, y por lo tanto, la volatilidad pronosticada es prácticamente plana
 
