@@ -79,7 +79,7 @@ Se graficaron las cinco series temporales para evaluar visualmente su comportami
 Se realizó una descomposición aditiva de las series. En estos datos, por lo general, las cinco series muestran comportamiento típico de retornos financieros: fluctuaciones alrededor de cero, sin tendencia clara y con variabilidad irregular. No se observa estacionalidad evidente. Algunas series (como X2 y X4) presentan mayor volatilidad, mientras que otras (como X3) son más estables. El componente aleatorio captura la mayor parte de la variabilidad.
 
 Una visualización con la serie X1 sería la siguiente:
-![Datos de las activos](images/descomposicion.png)
+![Descomposición](images/descomposicion.png)
 
 En todas las series temporales se observa que los residuos en el tiempo oscilan alrededor de cero sin patrones visibles, tampoco muestran tendencia ni cambios bruscos de varianza.
 
@@ -87,9 +87,38 @@ El ACF de residuos, la mayoría de los lags están dentro de las bandas de confi
 
 
 Los gráficos ACF y PACF de la series en general muestran un decaimiento lento  X1 muestran [describe el patrón: por ejemplo, decaimiento lento en ACF y corte abrupto en PACF], lo que sugiere un modelo AR(p) adecuado. Esta información guía la selección de parámetros en el modelo ARIMA.
-![Datos de las activos](images/residuos_arima.png)
+![Residuos del Modelo ARIMA](images/residuos_arima.png)
+
 Los análisis de las series temporales indican que los retornos no exhiben tendencias o estacionalidades notables. Las descomposiciones corroboran que la mayor parte de la variabilidad se origina en el componente aleatorio. Las funciones ACF y PACF señalan que las series son adecuadas para el modelado ARIMA y presentan estacionaridad. Por último, los gráficos de residuos evidencian la falta de autocorrelación y un comportamiento de ruido blanco, lo que confirma que los modelos ARIMA ajustados son adecuados para prever la volatilidad y los retornos.
 
+
+
+Los resultados de las predicciones en estos casos nunca son exactos porque en mercados financieros los retornos son muy ruidosos, y el valor esperado suele ser más suave.
+En este caso, en la imagen se observa cómo en los 5 activos la línea azul (predicha) es más estable, pues ARIMA filtra el ruido de alta frecuencia.
+Concretamente, en los activos 1, 4 y 5 se observan cambios de nivel, ARIMA se está adaptando lentamente (esto puede ser devido a alguna dependencia temporal débil).
+Y los activos 2 y 3 son los más cercanos a ruido blanco. Su retorno retorno real oscila al rededor de 0, y su predicción es más aplanada.
+
+![Real vs Predicho](images/real_vs_predicho.png)
+
+La volatilidad de estos activos se estimó como la desviación estándar del pronóstico one-step-ahead.
+Dado que ARIMA asume varianza constante en los errores, la volatilidad estimada resulta prácticamente constante en el periodo test para la mayoría de los activos, lo cual es consistente con las hipótesis del modelo.
+
+En la gráfica se observa que el activo 1 se observa una leve pendiente o cambio suave. Esto ocurre porque el modelo ARIMA se reestima dinámicamente al incorporar nuevos datos, la estimación de 
+𝜎^2 puede ajustarse ligeramente, especialmente si el modelo incluye integración (d > 0) o cambios en residuos. Con esto se cumple que la diagonal de Σ𝑡será constante en 𝑡, lo cual simplifica la optimización.
+
+En los demás activos, el modelo ARIMA clásico modela la media condicional del proceso, no modela volatilidad dinámica, asume que los errores tienen varianza constante. Es por ello que los intervalos de predicción tienen ancho casi constante, y por lo tanto, la volatilidad pronosticada es prácticamente plana
+
+![Volatilidad](images/volatilidad.png)
+
+En la siguiente gráfica se observa la representación de cómo se asiganan los pesos promedio de inversión en cada activo en el perioro de testeo bajo el modelo de utilidad media-varianza con posiciones cortas permitidas.
+
+El activo 5 tiene el peso promedio más alto (~0.8), es decir, posee un rendimiento esperado alto y una volatilidad controlad, el modelo confía bastante en este activo. Los activos 1 y 4 presentan pesos positivos moderados (~0.4), son buenos, pero no hay tanta convicción. Los activos 2 y 3 muestran características menos atractivas (ya sea por bajo rendimiento esperado o alta volatilidad relativa), lo que lleva al modelo a asignarles posiciones cortas.
+
+![Pesos Promedios](images/pesos_promedios.png)
+
+La gráfica siguiente ilustra cómo ha cambiado el portafolio creado bajo la norma de utilidad logarítmica, cuyo objetivo es optimizar el crecimiento compuesto del capital. Este método, a diferencia de la utilidad media-varianza, castiga con severidad las pérdidas y promueve tácticas más conservadoras en situaciones de volatilidad alta. Para calcular el valor acumulado, se utilizan los rendimientos ponderados por los pesos óptimos en cada momento y, posteriormente, se suman los factores de crecimiento. La curva final muestra una tendencia ascendente, acelerándose al final del periodo, lo cual sugiere que el modelo fue capaz de identificar oportunidades de inversión con buena rentabilidad y modificar dinámicamente la distribución de activos en función del riesgo y el rendimiento esperado.
+
+![Uitilidad Log](images/evolucion_utilidad_log.png)
 
 
 # Distribución del proyecto

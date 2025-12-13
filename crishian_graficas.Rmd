@@ -437,7 +437,10 @@ print(evals)
 #Gráfica 1: Real vs Predicho (activo)
 ```{r}
 library(ggplot2)
-par(mfrow = c(2, 3))
+library(gridExtra)
+
+plots <- list()
+
 for(i in 1:5){
   df <- data.frame(
     t = 1:nrow(Xtest),
@@ -445,15 +448,16 @@ for(i in 1:5){
     Pred = mu_hat[,i]
   )
   
-  print(
+  p <-
     ggplot(df, aes(t)) +
       geom_line(aes(y=Real), color="black", size=1) +
       geom_line(aes(y=Pred), color="blue", size=1) +
       labs(title=paste("Real vs Predicho - Activo", i),
            x="Tiempo Test", y="Retorno") +
       theme_minimal()
-  )
+  plots[[i]] <- p
 }
+grid.arrange(grobs = plots, ncol = 2)
 
 ```
 
@@ -461,6 +465,9 @@ for(i in 1:5){
 #Gráfica 2: Volatilidad pronosticada σ̂_t (activo 1)
 ```{r}
 library(ggplot2)
+library(gridExtra)
+
+plots <- list()
 
 for(i in 1:5){
   
@@ -469,7 +476,7 @@ for(i in 1:5){
     sigma = se_hat[, i]
   )
   
-  print(
+  p <-
     ggplot(df, aes(x = t, y = sigma)) +
       geom_line(size = 1, color = "red") +
       labs(
@@ -478,9 +485,10 @@ for(i in 1:5){
         y = expression(sigma[hat]~(t))
       ) +
       theme_minimal()
-  )
+  plots[[i]] <- p
 }
 
+grid.arrange(grobs = plots, ncol = 2)
 ```
 
 #Gráfica 3: Heatmap / Matriz de pesos α_t
@@ -524,7 +532,7 @@ df_melt <- melt(df_alpha, id="time")
 
 ggplot(df_melt, aes(time, variable, fill=value)) +
   geom_tile() +
-  scale_fill_gradient(low="white", high="blue") +
+  scale_fill_gradient(low="gray", high="blue") +
   labs(title="Pesos α_t - MV Sin Cortos", x="Tiempo", y="Activo")
 
 
